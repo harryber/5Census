@@ -33,6 +33,10 @@ public class Client {
 	public Base64.Encoder encoder = Base64.getEncoder();
 	public Base64.Decoder decoder = Base64.getDecoder();
 
+	public enum UserAction {
+		LOGOUT, VIEW, SUBMIT, DELETE, EDIT
+	}
+
 	public Client(String serverPortStr)
 			throws Exception {
 
@@ -56,21 +60,50 @@ public class Client {
 			System.out.println("Connected to Server");
 
 			DataOutputStream streamOut = new DataOutputStream(serverSocket.getOutputStream());
+			DataInputStream streamIn = new DataInputStream(new BufferedInputStream(serverSocket.getInputStream()));
 			streamOut.writeUTF(keyAgreement());
 			streamOut.flush();
 
 			// obtain the message from the user and send it to Server
 			// the communication ends when the user inputs "done"
 			String line = "";
-			while (!line.equals("done")) {
+			String messageToSend = "";
+			String packagedMsg = "";
+			boolean keepLooping = true;
+			while (keepLooping) {
 				try {
-					System.out.print("Type message: ");
+					System.out.print("\nWhat would you like to do? \n logout \n exit \n view board \n submit message\n\n");
 					line = console.nextLine();
 
-					String packagedMsg = packageMessage(line);
-					streamOut.writeUTF(packagedMsg);
-					streamOut.flush();
-					System.out.println("Message sent");
+					switch (line) {
+						case "logout":
+							System.out.println("HAH you thought you could escape?");
+							break;
+						case "exit":
+							keepLooping = false;
+							break;
+						case "view board":
+							System.out.println("Viewing board...");
+							packagedMsg = packageMessage("SEND ME THE BOARD PLEEEEEASE");
+							// packagedMsg = packageMessage(messageToSend);
+							streamOut.writeUTF(packagedMsg);
+							streamOut.flush();
+							String incomingMsg = decryptMessage(streamIn.readUTF());
+							System.out.println("Incoming message: " + incomingMsg);
+							break;
+						case "submit message":
+							System.out.println("What message would you like to submit?\n");
+							messageToSend = console.nextLine();
+							packagedMsg = packageMessage(messageToSend);
+							streamOut.writeUTF(packagedMsg);
+							streamOut.flush();
+							System.out.println("Message sent");
+							break;
+						default:
+							break;
+					}
+
+					
 
 				} catch (IOException ioe) {
 					System.out.println("Sending error: " + ioe.getMessage());
@@ -107,6 +140,18 @@ public class Client {
 		acc.append(Gen.encodeHexString(sign.sign()));
 
 		return acc.toString();
+	}
+
+	public String decryptMessage(String message)
+			throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException,
+			BadPaddingException, InvalidAlgorithmParameterException {
+		String[] tokens = message.split(",");
+		Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+		GCMParameterSpec params = new GCMParameterSpec(128, Gen.decodeHexString(tokens[1]));
+
+		cipher.init(Cipher.DECRYPT_MODE, secretKey, params);
+
+		return new String(cipher.doFinal(Gen.decodeHexString(tokens[0])));
 	}
 
 	private String keyAgreement() throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException,

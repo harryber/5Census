@@ -18,6 +18,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Scanner;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -60,17 +61,21 @@ public class Server {
 		try {
 			System.out.println("Connecting to port " + portNumber + "...");
 			ServerSocket bobServer = new ServerSocket(portNumber);
+			bobServer.setReuseAddress(true);
 			System.out.println("Bob Server started at port " + portNumber);
 
 			// accept the client(a.k.a. Alice)
 			Socket clientSocket = bobServer.accept();
 			System.out.println("Client connected");
 			DataInputStream streamIn = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
-
+			DataOutputStream streamOut = new DataOutputStream(clientSocket.getOutputStream());
 			boolean finished = false;
 			boolean first = true;
 
 			// read input from Alice
+			String messageToSend = "";
+			String packagedMsg = "";
+			Scanner console = new Scanner(System.in);
 			while (!finished) {
 				try {
 					String incomingMsg = streamIn.readUTF();
@@ -80,6 +85,14 @@ public class Server {
 						first = false;
 					} else {
 						if (verifyMessage(incomingMsg)) {
+							if (decryptMessage(incomingMsg).equals("SEND ME THE BOARD PLEEEEEASE"))
+							{
+								System.out.println("Sending board to client...");
+								messageToSend = console.nextLine();
+								packagedMsg = packageMessage(messageToSend);
+								streamOut.writeUTF(packagedMsg);
+								
+							}
 							System.out.println("Recieved msg: " + decryptMessage(incomingMsg));
 						} else {
 							System.out.println("Signature Verifcation Failed");
@@ -188,6 +201,26 @@ public class Server {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+
+	private String packageMessage(String message) throws Exception {
+		StringBuilder acc = new StringBuilder();
+
+		Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+		cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+		GCMParameterSpec spec = cipher.getParameters().getParameterSpec(GCMParameterSpec.class);
+
+		acc.append(Gen.encodeHexString(cipher.doFinal(message.getBytes())));
+		acc.append(",");
+		acc.append(Gen.encodeHexString(spec.getIV()));
+
+		Signature sign = Signature.getInstance("SHA256withRSA");
+		sign.initSign(privateMacKey); // signs with alice's private key
+		sign.update(acc.toString().getBytes());
+		acc.append(",");
+		acc.append(Gen.encodeHexString(sign.sign()));
+
+		return acc.toString();
 	}
 
 }
