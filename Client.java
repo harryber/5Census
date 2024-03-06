@@ -29,6 +29,7 @@ public class Client {
 	private PublicKey bobKey;
 	private PublicKey bobMacKey;
 	private SecretKey secretKey;
+	private Scanner console;
 
 	public Base64.Encoder encoder = Base64.getEncoder();
 	public Base64.Decoder decoder = Base64.getDecoder();
@@ -47,7 +48,7 @@ public class Client {
 		privateMacKey = Gen.readPKCS8PrivateKey(new File("a_macprivate.pem"));
 		bobMacKey = Gen.readPKCS8PublicKey(new File("b_macpublic.pem"));
 
-		Scanner console = new Scanner(System.in);
+		console = new Scanner(System.in);
 		System.out.println("This is Alice");
 
 		// obtain server's port number and connect to it
@@ -92,7 +93,7 @@ public class Client {
 					continue; // Skip to next iteration
 				}
 				try {
-					System.out.print("\nWhat would you like to do? \n logout \n exit \n view board \n submit message\n\n");
+					System.out.print("\nWhat would you like to do? \n logout \n exit \n view board \n post message\n\n");
 					line = console.nextLine();
 
 					switch (line) {
@@ -103,23 +104,32 @@ public class Client {
 							keepLooping = false;
 							break;
 						case "view board":
-							System.out.println("Viewing board...");
-							packagedMsg = packageMessage("SEND ME THE BOARD PLEEEEEASE");
-							// packagedMsg = packageMessage(messageToSend);
+							// select a board to look at
+							boardSelectClient(streamIn, streamOut);
+
+							// ask server to display a board
+							packagedMsg = packageMessage("<display board>");
 							streamOut.writeUTF(packagedMsg);
 							streamOut.flush();
+	
+							// print the server's response
 							String incomingMsg = decryptMessage(streamIn.readUTF());
-							System.out.println("Incoming message: " + incomingMsg);
+							System.out.println(incomingMsg);
 							break;
-						case "submit message":
-							System.out.println("What message would you like to submit?\n");
+						case "post message":
+							boardSelectClient(streamIn, streamOut);						
+							
+							messageToSend = "<post to board>";
+							streamOut.writeUTF(packageMessage(messageToSend));
+							System.out.println("What message would you like to post?\n");
 							messageToSend = console.nextLine();
 							packagedMsg = packageMessage(messageToSend);
 							streamOut.writeUTF(packagedMsg);
 							streamOut.flush();
-							System.out.println("Message sent");
+							// System.out.println("Message sent");
 							break;
 						default:
+							System.out.println("Invalid action");
 							break;
 					}
 
@@ -140,6 +150,25 @@ public class Client {
 			System.out.println("Connection failed due to following reason");
 			System.out.println(e);
 		}
+	}
+
+	private Integer boardSelectClient(DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
+		try {
+			// send a request to see the board options
+			streamOut.writeUTF(packageMessage("<boards request>"));
+			String incomingMsg = decryptMessage(streamIn.readUTF());
+			System.out.println("Select a board:\n" + incomingMsg + "\n");
+			
+			// pick a board
+			int selection = Integer.parseInt(console.nextLine());
+			streamOut.writeUTF(packageMessage(String.valueOf(selection)));
+			return selection;
+		}
+		catch (IOException ioe) {
+			System.out.println("Could not get boards to select: " + ioe.getMessage());
+			return -1;
+		}
+
 	}
 
 	private String packageMessage(String message) throws Exception {

@@ -16,6 +16,7 @@ import java.security.interfaces.RSAPublicKey;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
@@ -44,7 +45,9 @@ public class Server {
 	public Base64.Encoder encoder = Base64.getEncoder();
 	public Base64.Decoder decoder = Base64.getDecoder();
 
-    public Server(String bobPort) throws Exception {
+	
+
+	public Server(String bobPort, ArrayList<Board> boardArr) throws Exception {
 
 		publicKey = Gen.readPKCS8PublicKey(new File("b_public.pem"));
 		privateKey = Gen.readPKCS8PrivateKey(new File("b_private.pem"));
@@ -79,7 +82,8 @@ public class Server {
 			// read input from Alice
 			String messageToSend = "";
 			String packagedMsg = "";
-			Scanner console = new Scanner(System.in);
+			int selectedBoard = -1;
+			// Scanner console = new Scanner(System.in);
 			while (!finished) {
 				try {
 					String incomingMsg = streamIn.readUTF();
@@ -111,13 +115,41 @@ public class Server {
 
 					} else {
 						if (verifyMessage(incomingMsg)) {
+							
+							switch (decryptMessage(incomingMsg)) {
+								case "<post to board>":
+								incomingMsg = streamIn.readUTF();
+								if (verifyMessage(incomingMsg)) {
+									
+									String postContents = decryptMessage(incomingMsg);
+									Post newPost = new Post(boardArr.get(selectedBoard).getName(), postContents);
+									boardArr.get(selectedBoard).addPost(newPost);
+									System.out.println(boardArr.get(selectedBoard).getName() + ": " + boardArr.get(selectedBoard).viewPublicPosts());
+								}  else {
+									System.out.println("Signature Verifcation Failed");
+									finished = true;
+								}
+								
+									break;
+								case "<boards request>":
+									selectedBoard = boardSelectServer(boardArr, streamIn, streamOut);
+									break;
+								case "<display board>":
+									String boardContents = boardArr.get(selectedBoard).viewPublicPosts();
+									streamOut.writeUTF(packageMessage(boardContents));
+									break;
+								default:
+									break;
+							}
+							
 							if (decryptMessage(incomingMsg).equals("SEND ME THE BOARD PLEEEEEASE"))
 							{
 								System.out.println("Sending board to client...");
-								messageToSend = console.nextLine();
+								// messageToSend = console.nextLine();
+								
 								packagedMsg = packageMessage(messageToSend);
 								streamOut.writeUTF(packagedMsg);
-								
+								streamOut.flush();
 							}
 
 							System.out.println("Recieved msg: " + decryptMessage(incomingMsg));
@@ -136,6 +168,7 @@ public class Server {
 			// clean up the connections before closing
 			bobServer.close();
 			streamIn.close();
+			// console.close();
 			System.out.println("Bob closed");
 		} catch (IOException e) {
 			// print error if the server fails to create itself
@@ -143,6 +176,22 @@ public class Server {
 			System.out.println(e);
 		}
 
+	}
+
+	private Integer boardSelectServer(ArrayList<Board> boardArr, DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
+		// Construct the string of boards to send
+		String messageToSend = "";
+		for (int i = 0; i < boardArr.size(); i++) {
+			messageToSend += i + ": " + boardArr.get(i).getName() + "\n";
+		}
+
+		// Send the boards to the client
+		String packagedMsg = packageMessage(messageToSend);
+		streamOut.writeUTF(packagedMsg);
+		streamOut.flush();
+
+		int selection = Integer.parseInt(decryptMessage(streamIn.readUTF()));
+		return selection;
 	}
 
 	public boolean verifyMessage(String message)
@@ -218,12 +267,19 @@ public class Server {
 			return;
 		}
 
+
+		Board edmundsBoard = new Board("edmunds");
+		Board fraryBoard = new Board("frary");
+		ArrayList<Board> boardArr = new ArrayList<>();
+		boardArr.add(edmundsBoard);
+		boardArr.add(fraryBoard);
+
 		// Security.addProvider(new
 		// org.bouncycastle.jce.provider.BouncyCastleProvider());
 
 		// create Bob
 		try {
-			Server bob = new Server(args[0]);
+			Server bob = new Server(args[0], boardArr);
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
