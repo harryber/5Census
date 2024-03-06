@@ -18,6 +18,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.Scanner;
 
 import javax.crypto.BadPaddingException;
@@ -43,7 +44,7 @@ public class Server {
 	public Base64.Encoder encoder = Base64.getEncoder();
 	public Base64.Decoder decoder = Base64.getDecoder();
 
-	public Server(String bobPort) throws Exception {
+    public Server(String bobPort) throws Exception {
 
 		publicKey = Gen.readPKCS8PublicKey(new File("b_public.pem"));
 		privateKey = Gen.readPKCS8PrivateKey(new File("b_private.pem"));
@@ -52,6 +53,9 @@ public class Server {
 		publicMacKey = Gen.readPKCS8PublicKey(new File("b_macpublic.pem"));
 		privateMacKey = Gen.readPKCS8PrivateKey(new File("b_macprivate.pem"));
 		aliceMacKey = Gen.readPKCS8PublicKey(new File("a_macpublic.pem"));
+
+        HashMap<String, String> loginMap = new HashMap<String, String>();
+        loginMap.put("Steve", "12345"); loginMap.put("Alice", "321"); loginMap.put("Irwin", "password!");
 
 		// notify the identity of the server to the user
 		System.out.println("This is Bob");
@@ -64,14 +68,14 @@ public class Server {
 			bobServer.setReuseAddress(true);
 			System.out.println("Bob Server started at port " + portNumber);
 
-			// accept the client(a.k.a. Alice)
+			// accept the client (a.k.a. Alice)
 			Socket clientSocket = bobServer.accept();
 			System.out.println("Client connected");
 			DataInputStream streamIn = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
 			DataOutputStream streamOut = new DataOutputStream(clientSocket.getOutputStream());
 			boolean finished = false;
 			boolean first = true;
-
+			boolean user_authenticated = false;
 			// read input from Alice
 			String messageToSend = "";
 			String packagedMsg = "";
@@ -81,8 +85,30 @@ public class Server {
 					String incomingMsg = streamIn.readUTF();
 					if (first) {
 						finished = !keyAgreement(incomingMsg);
-
 						first = false;
+
+						while (!user_authenticated) {
+							messageToSend = "Enter username and password (separated by space)";
+							System.out.println(messageToSend);
+							streamOut.writeUTF(packageMessage(messageToSend));
+							streamOut.flush();
+
+							String credentials = streamIn.readUTF();
+							String[] parts = credentials.split(" ");
+							String username = parts[0];
+							String password = parts[1];
+
+
+							if (loginMap.containsKey(username) && loginMap.get(username).equals(password)) {
+								user_authenticated = true;
+								streamOut.writeUTF("success");
+								streamOut.flush();
+							} else {
+								streamOut.writeUTF("failure");
+								streamOut.flush();
+							}
+						}
+
 					} else {
 						if (verifyMessage(incomingMsg)) {
 							if (decryptMessage(incomingMsg).equals("SEND ME THE BOARD PLEEEEEASE"))
@@ -93,6 +119,7 @@ public class Server {
 								streamOut.writeUTF(packagedMsg);
 								
 							}
+
 							System.out.println("Recieved msg: " + decryptMessage(incomingMsg));
 						} else {
 							System.out.println("Signature Verifcation Failed");

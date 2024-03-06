@@ -70,7 +70,27 @@ public class Client {
 			String messageToSend = "";
 			String packagedMsg = "";
 			boolean keepLooping = true;
+			boolean logged_in = false;
 			while (keepLooping) {
+				while (!logged_in) {
+					String serverResponse = decryptMessage(streamIn.readUTF());
+					if (serverResponse.equals("Enter username and password (separated by space)")) { // can change this later
+						System.out.println(serverResponse);
+						String credentials = console.nextLine();
+						streamOut.writeUTF(credentials);
+						streamOut.flush();
+
+
+						String authStatus = streamIn.readUTF();
+						if (authStatus.equals("success")) {
+							logged_in = true;
+						} else {
+							System.out.println("Invalid credentials. Please try again.");
+						}
+					}
+
+					continue; // Skip to next iteration
+				}
 				try {
 					System.out.print("\nWhat would you like to do? \n logout \n exit \n view board \n submit message\n\n");
 					line = console.nextLine();
