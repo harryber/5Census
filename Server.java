@@ -82,7 +82,7 @@ public class Server {
 			// read input from Alice
 			String messageToSend = "";
 			String packagedMsg = "";
-			int selectedBoard = -1;
+			Board selectedBoard = new Board("<NULL BOARD>");
 			// Scanner console = new Scanner(System.in);
 			while (!finished) {
 				try {
@@ -118,13 +118,26 @@ public class Server {
 							
 							switch (decryptMessage(incomingMsg)) {
 								case "<post to board>":
+
+								if (checkForErrorBoardSelection(selectedBoard, streamOut, 
+								"Error posting to board, selected board invalid.")) {
+									// streamOut.writeUTF("<board select failed>");
+									// streamOut.flush();
+									break;
+
+								// } else {
+								// 	streamOut.writeUTF("<board select success>");
+								// 	streamOut.flush();
+								}
+
 								incomingMsg = streamIn.readUTF();
 								if (verifyMessage(incomingMsg)) {
-									
 									String postContents = decryptMessage(incomingMsg);
-									Post newPost = new Post(boardArr.get(selectedBoard).getName(), postContents);
-									boardArr.get(selectedBoard).addPost(newPost);
-									System.out.println(boardArr.get(selectedBoard).getName() + ": " + boardArr.get(selectedBoard).viewPublicPosts());
+									
+									
+									Post newPost = new Post(selectedBoard.getName(), postContents);
+									selectedBoard.addPost(newPost);
+									System.out.println(selectedBoard.getName() + ": " + selectedBoard.viewPublicPosts());
 								}  else {
 									System.out.println("Signature Verifcation Failed");
 									finished = true;
@@ -135,7 +148,9 @@ public class Server {
 									selectedBoard = boardSelectServer(boardArr, streamIn, streamOut);
 									break;
 								case "<display board>":
-									String boardContents = boardArr.get(selectedBoard).viewPublicPosts();
+									if (checkForErrorBoardSelection(selectedBoard, streamOut, 
+										"Error displaying board, selected board invalid.")) break;
+									String boardContents = selectedBoard.viewPublicPosts();
 									streamOut.writeUTF(packageMessage(boardContents));
 									break;
 								default:
@@ -178,9 +193,30 @@ public class Server {
 
 	}
 
-	private Integer boardSelectServer(ArrayList<Board> boardArr, DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
+	private boolean checkForErrorBoardSelection(Board selectedBoard, DataOutputStream streamOut, String message) throws IOException, Exception {
+		// Do not write to a board if a board is not selected properly
+		if (selectedBoard.getName().equals("<NULL BOARD>")) {
+			streamOut.writeUTF(packageMessage(message));
+			streamOut.flush();
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Bridge method between server and client in order 
+	 * to determine which board the client is trying to 
+	 * interact with
+	 * 
+	 * @param boardArr Array of all boards
+	 * @param streamIn
+	 * @param streamOut
+	 * @return
+	 * @throws Exception
+	 */
+	private Board boardSelectServer(ArrayList<Board> boardArr, DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
 		// Construct the string of boards to send
-		String messageToSend = "";
+		String messageToSend = "Select a board:\n";
 		for (int i = 0; i < boardArr.size(); i++) {
 			messageToSend += i + ": " + boardArr.get(i).getName() + "\n";
 		}
@@ -190,8 +226,25 @@ public class Server {
 		streamOut.writeUTF(packagedMsg);
 		streamOut.flush();
 
-		int selection = Integer.parseInt(decryptMessage(streamIn.readUTF()));
-		return selection;
+
+		Board postBoard = new Board("<NULL BOARD>");
+		
+		// User inputs a board to select
+		String selection = decryptMessage(streamIn.readUTF());
+
+		// Confirm that the selected board actually exists
+
+		for (Board b : boardArr) {
+			if (b.getName().equals(selection)) {
+				postBoard = b;
+			}
+		}
+		
+
+
+
+
+		return postBoard;
 	}
 
 	public boolean verifyMessage(String message)

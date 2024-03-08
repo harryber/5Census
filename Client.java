@@ -118,9 +118,13 @@ public class Client {
 							break;
 						case "post message":
 							boardSelectClient(streamIn, streamOut);						
-							
+
 							messageToSend = "<post to board>";
 							streamOut.writeUTF(packageMessage(messageToSend));
+							streamOut.flush();
+
+							// if (decryptMessage(streamIn.readUTF()).equals("<board select failed>"))
+
 							System.out.println("What message would you like to post?\n");
 							messageToSend = console.nextLine();
 							packagedMsg = packageMessage(messageToSend);
@@ -152,21 +156,21 @@ public class Client {
 		}
 	}
 
-	private Integer boardSelectClient(DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
+	private String boardSelectClient(DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
 		try {
 			// send a request to see the board options
 			streamOut.writeUTF(packageMessage("<boards request>"));
-			String incomingMsg = decryptMessage(streamIn.readUTF());
-			System.out.println("Select a board:\n" + incomingMsg + "\n");
-			
+			String boardMsgPrompt = decryptMessage(streamIn.readUTF());
+			// System.out.println("Select a board:\n" + incomingMsg + "\n");
+			System.out.println(boardMsgPrompt);
 			// pick a board
-			int selection = Integer.parseInt(console.nextLine());
-			streamOut.writeUTF(packageMessage(String.valueOf(selection)));
+			String selection = console.nextLine();
+			streamOut.writeUTF(packageMessage(selection));
 			return selection;
 		}
 		catch (IOException ioe) {
 			System.out.println("Could not get boards to select: " + ioe.getMessage());
-			return -1;
+			return "";
 		}
 
 	}
