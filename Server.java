@@ -4,28 +4,19 @@ import java.net.*;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.SecureRandom;
-import java.security.Security;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
-import java.util.Scanner;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
@@ -42,12 +33,16 @@ public class Server {
 	private RSAPublicKey aliceMacKey;
 	private SecretKey secretKey;
 
+	private ServerSocket serverSocket;
+
 	public Base64.Encoder encoder = Base64.getEncoder();
 	public Base64.Decoder decoder = Base64.getDecoder();
 
-	
+	public ArrayList<Board> boardArr;
+	public HashMap<String, String> loginMap;
+	public Board selectedBoard;
 
-	public Server(String bobPort, ArrayList<Board> boardArr) throws Exception {
+	public Server(String bobPort, HashMap<String, String> loginMap, ArrayList<Board> boardArr) throws Exception {
 
 		publicKey = Gen.readPKCS8PublicKey(new File("b_public.pem"));
 		privateKey = Gen.readPKCS8PrivateKey(new File("b_private.pem"));
@@ -56,142 +51,174 @@ public class Server {
 		publicMacKey = Gen.readPKCS8PublicKey(new File("b_macpublic.pem"));
 		privateMacKey = Gen.readPKCS8PrivateKey(new File("b_macprivate.pem"));
 		aliceMacKey = Gen.readPKCS8PublicKey(new File("a_macpublic.pem"));
-
-        HashMap<String, String> loginMap = new HashMap<String, String>();
-        loginMap.put("Steve", "12345"); loginMap.put("Alice", "321"); loginMap.put("Irwin", "password!");
+		this.loginMap = loginMap;
+		this.boardArr = boardArr;
 
 		// notify the identity of the server to the user
 		System.out.println("This is Bob");
 
 		// attempt to create a server with the given port number
 		int portNumber = Integer.parseInt(bobPort);
-		try {
-			System.out.println("Connecting to port " + portNumber + "...");
-			ServerSocket bobServer = new ServerSocket(portNumber);
-			bobServer.setReuseAddress(true);
-			System.out.println("Bob Server started at port " + portNumber);
+			try {
+				System.out.println("Connecting to port " + portNumber + "...");
+				serverSocket = new ServerSocket(portNumber);
+				serverSocket.setReuseAddress(true);
+				System.out.println("Bob Server started at port " + portNumber);
 
-			// accept the client (a.k.a. Alice)
-			Socket clientSocket = bobServer.accept();
-			System.out.println("Client connected");
-			DataInputStream streamIn = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
-			DataOutputStream streamOut = new DataOutputStream(clientSocket.getOutputStream());
-			boolean finished = false;
-			boolean first = true;
-			boolean user_authenticated = false;
-			// read input from Alice
-			String messageToSend = "";
-			String packagedMsg = "";
-			Board selectedBoard = new Board("<NULL BOARD>");
-			// Scanner console = new Scanner(System.in);
-			while (!finished) {
-				try {
-					String incomingMsg = streamIn.readUTF();
-					if (first) {
-						finished = !keyAgreement(incomingMsg);
-						first = false;
-
-						while (!user_authenticated) {
-							messageToSend = "Enter username and password (separated by space)";
-							System.out.println(messageToSend);
-							streamOut.writeUTF(packageMessage(messageToSend));
-							streamOut.flush();
-
-							String credentials = streamIn.readUTF();
-							String[] parts = credentials.split(" ");
-							String username = parts[0];
-							String password = parts[1];
-
-
-							if (loginMap.containsKey(username) && loginMap.get(username).equals(password)) {
-								user_authenticated = true;
-								streamOut.writeUTF("success");
-								streamOut.flush();
-							} else {
-								streamOut.writeUTF("failure");
-								streamOut.flush();
-							}
-						}
-
-					} else {
-						if (verifyMessage(incomingMsg)) {
-							
-							switch (decryptMessage(incomingMsg)) {
-								case "<post to board>":
-
-								if (checkForErrorBoardSelection(selectedBoard, streamOut, 
-								"Error posting to board, selected board invalid.")) {
-									// streamOut.writeUTF("<board select failed>");
-									// streamOut.flush();
-									break;
-
-								// } else {
-								// 	streamOut.writeUTF("<board select success>");
-								// 	streamOut.flush();
-								}
-
-								incomingMsg = streamIn.readUTF();
-								if (verifyMessage(incomingMsg)) {
-									String postContents = decryptMessage(incomingMsg);
-									
-									
-									Post newPost = new Post(selectedBoard.getName(), postContents);
-									selectedBoard.addPost(newPost);
-									System.out.println(selectedBoard.getName() + ": " + selectedBoard.viewPublicPosts());
-								}  else {
-									System.out.println("Signature Verifcation Failed");
-									finished = true;
-								}
-								
-									break;
-								case "<boards request>":
-									selectedBoard = boardSelectServer(boardArr, streamIn, streamOut);
-									break;
-								case "<display board>":
-									if (checkForErrorBoardSelection(selectedBoard, streamOut, 
-										"Error displaying board, selected board invalid.")) break;
-									String boardContents = selectedBoard.viewPublicPosts();
-									streamOut.writeUTF(packageMessage(boardContents));
-									break;
-								default:
-									break;
-							}
-							
-							if (decryptMessage(incomingMsg).equals("SEND ME THE BOARD PLEEEEEASE"))
-							{
-								System.out.println("Sending board to client...");
-								// messageToSend = console.nextLine();
-								
-								packagedMsg = packageMessage(messageToSend);
-								streamOut.writeUTF(packagedMsg);
-								streamOut.flush();
-							}
-
-							System.out.println("Recieved msg: " + decryptMessage(incomingMsg));
-						} else {
-							System.out.println("Signature Verifcation Failed");
-							finished = true;
-						}
-					}
-					finished = incomingMsg.split(",")[0].equals("done") || finished; // possibly need to update
-				} catch (IOException ioe) {
-					// disconnect if there is an error reading the input
-					finished = true;
-				}
+			} catch (IOException e) {
+				// print error if the server fails to create itself
+				System.out.println("Error in creating the server");
+				System.out.println(e);
 			}
 
 			// clean up the connections before closing
-			bobServer.close();
-			streamIn.close();
-			// console.close();
-			System.out.println("Bob closed");
-		} catch (IOException e) {
-			// print error if the server fails to create itself
-			System.out.println("Error in creating the server");
-			System.out.println(e);
-		}
+//			serverSocket.close();
+//			System.out.println("Bob closed");
 
 	}
+
+	public void start() {
+		while (true) {
+			try {
+				Socket clientSocket = serverSocket.accept();
+				System.out.println("Client connected");
+
+				ClientHandler clientHandler = new ClientHandler(clientSocket);
+				new Thread(clientHandler).start();
+
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	private class ClientHandler implements Runnable {
+		private Socket clientSocket;
+		private DataInputStream streamIn;
+		private DataOutputStream streamOut;
+
+		public ClientHandler(Socket socket){
+			this.clientSocket = socket;
+			try {
+				streamIn = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
+				streamOut = new DataOutputStream(clientSocket.getOutputStream());
+			} catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+		@Override
+		public void run() {
+			boolean finished = false;
+			boolean first = true;
+
+			try {
+				while (!finished) {
+					if (streamIn.available() > 0) {
+						String incomingMsg = streamIn.readUTF();
+						if (first) {
+							finished = !keyAgreement(incomingMsg);
+							first = false;
+							authenticateUser(streamIn, streamOut);
+						} else {
+							if (verifyMessage(incomingMsg)) {
+								String decryptedMsg = decryptMessage(incomingMsg);
+								processMessage(decryptedMsg, streamIn, streamOut);
+							} else {
+								System.out.println("Signature Verification Failed");
+								finished = true;
+							}
+						}
+						finished = incomingMsg.split(",")[0].equals("done") || finished;
+					}
+				}
+			} catch (SocketException e) {
+				System.out.println("Client connection closed unexpectedly");
+			} catch (IOException | NoSuchAlgorithmException | InvalidKeyException | SignatureException |
+                     NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException e) {
+				System.out.println("IO Exception occurred: " + e.getMessage());
+			} catch (InvalidAlgorithmParameterException e) {
+                throw new RuntimeException(e);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            } finally {
+				// clean up client if connection closed
+				try {
+					clientSocket.close();
+					streamIn.close();
+					streamOut.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		private void authenticateUser(DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
+			while (true) {
+				String messageToSend = "Enter username and password (separated by space)";
+				streamOut.writeUTF(packageMessage(messageToSend));
+				streamOut.flush();
+				String credentials = streamIn.readUTF();
+				String[] parts = credentials.split(" ");
+				String username = parts[0];
+				String password = parts[1];
+
+				if (loginMap.containsKey(username) && loginMap.get(username).equals(password)) {
+					streamOut.writeUTF("success");
+					streamOut.flush();
+					return;
+				} else {
+					streamOut.writeUTF("failure");
+					streamOut.flush();
+				}
+			}
+		}
+
+		private void processMessage(String decryptedMsg, DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
+
+			switch (decryptedMsg) {
+				case "<post to board>":
+					if (checkForErrorBoardSelection(selectedBoard, streamOut,
+							"Error posting to board, selected board invalid.")) {
+						// streamOut.writeUTF("<board select failed>");
+						// streamOut.flush();
+						break;
+
+						// } else {
+						// 	streamOut.writeUTF("<board select success>");
+						// 	streamOut.flush();
+					}
+
+					String incomingMsg = streamIn.readUTF();
+					if (verifyMessage(incomingMsg)) {
+						String postContents = decryptMessage(incomingMsg);
+
+
+						Post newPost = new Post(selectedBoard.getName(), postContents);
+						selectedBoard.addPost(newPost);
+						System.out.println(selectedBoard.getName() + ": " + selectedBoard.viewPublicPosts());
+					}  else {
+						System.out.println("Signature Verification Failed");
+						// finished = true;
+					}
+
+					break;
+				case "<boards request>":
+//					System.out.println(streamIn.readUTF());
+					selectedBoard = boardSelectServer(boardArr, streamIn, streamOut);
+					break;
+				case "<display board>":
+//					System.out.println(streamIn.readUTF());
+					if (checkForErrorBoardSelection(selectedBoard, streamOut,
+							"Error displaying board, selected board invalid.")) break;
+					String boardContents = selectedBoard.viewPublicPosts();
+					streamOut.writeUTF(packageMessage(boardContents));
+					break;
+				default:
+					break;
+			}
+		}
+	}
+
 
 	private boolean checkForErrorBoardSelection(Board selectedBoard, DataOutputStream streamOut, String message) throws IOException, Exception {
 		// Do not write to a board if a board is not selected properly
@@ -239,11 +266,6 @@ public class Server {
 				postBoard = b;
 			}
 		}
-		
-
-
-
-
 		return postBoard;
 	}
 
@@ -320,6 +342,8 @@ public class Server {
 			return;
 		}
 
+		HashMap<String, String> loginMap = new HashMap<String, String>();
+		loginMap.put("Steve", "12345"); loginMap.put("Alice", "321"); loginMap.put("Irwin", "password!");
 
 		Board edmundsBoard = new Board("edmunds");
 		Board fraryBoard = new Board("frary");
@@ -332,7 +356,8 @@ public class Server {
 
 		// create Bob
 		try {
-			Server bob = new Server(args[0], boardArr);
+			Server bob = new Server(args[0], loginMap, boardArr);
+			bob.start();
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -358,5 +383,5 @@ public class Server {
 
 		return acc.toString();
 	}
-
 }
+
