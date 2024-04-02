@@ -33,7 +33,6 @@ public class Server {
 	private RSAPublicKey aliceKey;
 	private RSAPublicKey aliceMacKey;
 	private SecretKey secretKey;
-	private ArrayList<Board> boards;
 
 	private ServerSocket serverSocket;
 
@@ -54,7 +53,7 @@ public class Server {
 		privateMacKey = Gen.readPKCS8PrivateKey(new File("b_macprivate.pem"));
 		aliceMacKey = Gen.readPKCS8PublicKey(new File("a_macpublic.pem"));
 		this.loginMap = loginMap;
-		this.boardArr = boardArr;
+		readBoardFile("boards.txt");
 
 		// notify the identity of the server to the user
 		System.out.println("This is Bob");
@@ -376,7 +375,7 @@ public class Server {
 		ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
 		@SuppressWarnings("unchecked")
 		ArrayList<Board> blist = (ArrayList<Board>) objectInputStream.readObject();
-		this.boards = blist;
+		this.boardArr = blist;
 		objectInputStream.close();
 	}
 
