@@ -1,6 +1,7 @@
 
 import java.io.*;
 import java.net.*;
+import java.nio.file.Path;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -41,11 +42,10 @@ public class Server {
 	private RSAPublicKey aliceKey;
 	private RSAPublicKey aliceMacKey;
 	private SecretKey secretKey;
+	private ArrayList<Board> boards;
 
 	public Base64.Encoder encoder = Base64.getEncoder();
 	public Base64.Decoder decoder = Base64.getDecoder();
-
-	
 
 	public Server(String bobPort, ArrayList<Board> boardArr) throws Exception {
 
@@ -57,8 +57,12 @@ public class Server {
 		privateMacKey = Gen.readPKCS8PrivateKey(new File("b_macprivate.pem"));
 		aliceMacKey = Gen.readPKCS8PublicKey(new File("a_macpublic.pem"));
 
-        HashMap<String, String> loginMap = new HashMap<String, String>();
-        loginMap.put("Steve", "12345"); loginMap.put("Alice", "321"); loginMap.put("Irwin", "password!");
+		readBoardFile("boards.txt");
+
+		HashMap<String, String> loginMap = new HashMap<String, String>();
+		loginMap.put("Steve", "12345");
+		loginMap.put("Alice", "321");
+		loginMap.put("Irwin", "password!");
 
 		// notify the identity of the server to the user
 		System.out.println("This is Bob");
@@ -102,7 +106,6 @@ public class Server {
 							String username = parts[0];
 							String password = parts[1];
 
-
 							if (loginMap.containsKey(username) && loginMap.get(username).equals(password)) {
 								user_authenticated = true;
 								streamOut.writeUTF("success");
@@ -115,53 +118,53 @@ public class Server {
 
 					} else {
 						if (verifyMessage(incomingMsg)) {
-							
+
 							switch (decryptMessage(incomingMsg)) {
 								case "<post to board>":
 
-								if (checkForErrorBoardSelection(selectedBoard, streamOut, 
-								"Error posting to board, selected board invalid.")) {
-									// streamOut.writeUTF("<board select failed>");
-									// streamOut.flush();
-									break;
+									if (checkForErrorBoardSelection(selectedBoard, streamOut,
+											"Error posting to board, selected board invalid.")) {
+										// streamOut.writeUTF("<board select failed>");
+										// streamOut.flush();
+										break;
 
-								// } else {
-								// 	streamOut.writeUTF("<board select success>");
-								// 	streamOut.flush();
-								}
+										// } else {
+										// streamOut.writeUTF("<board select success>");
+										// streamOut.flush();
+									}
 
-								incomingMsg = streamIn.readUTF();
-								if (verifyMessage(incomingMsg)) {
-									String postContents = decryptMessage(incomingMsg);
-									
-									
-									Post newPost = new Post(selectedBoard.getName(), postContents);
-									selectedBoard.addPost(newPost);
-									System.out.println(selectedBoard.getName() + ": " + selectedBoard.viewPublicPosts());
-								}  else {
-									System.out.println("Signature Verifcation Failed");
-									finished = true;
-								}
-								
+									incomingMsg = streamIn.readUTF();
+									if (verifyMessage(incomingMsg)) {
+										String postContents = decryptMessage(incomingMsg);
+
+										Post newPost = new Post(selectedBoard.getName(), postContents);
+										selectedBoard.addPost(newPost);
+										System.out.println(
+												selectedBoard.getName() + ": " + selectedBoard.viewPublicPosts());
+									} else {
+										System.out.println("Signature Verifcation Failed");
+										finished = true;
+									}
+
 									break;
 								case "<boards request>":
-									selectedBoard = boardSelectServer(boardArr, streamIn, streamOut);
+									selectedBoard = boardSelectServer(boards, streamIn, streamOut);
 									break;
 								case "<display board>":
-									if (checkForErrorBoardSelection(selectedBoard, streamOut, 
-										"Error displaying board, selected board invalid.")) break;
+									if (checkForErrorBoardSelection(selectedBoard, streamOut,
+											"Error displaying board, selected board invalid."))
+										break;
 									String boardContents = selectedBoard.viewPublicPosts();
 									streamOut.writeUTF(packageMessage(boardContents));
 									break;
 								default:
 									break;
 							}
-							
-							if (decryptMessage(incomingMsg).equals("SEND ME THE BOARD PLEEEEEASE"))
-							{
+
+							if (decryptMessage(incomingMsg).equals("SEND ME THE BOARD PLEEEEEASE")) {
 								System.out.println("Sending board to client...");
 								// messageToSend = console.nextLine();
-								
+
 								packagedMsg = packageMessage(messageToSend);
 								streamOut.writeUTF(packagedMsg);
 								streamOut.flush();
@@ -181,6 +184,7 @@ public class Server {
 			}
 
 			// clean up the connections before closing
+			saveBoards("boards.txt");
 			bobServer.close();
 			streamIn.close();
 			// console.close();
@@ -193,7 +197,8 @@ public class Server {
 
 	}
 
-	private boolean checkForErrorBoardSelection(Board selectedBoard, DataOutputStream streamOut, String message) throws IOException, Exception {
+	private boolean checkForErrorBoardSelection(Board selectedBoard, DataOutputStream streamOut, String message)
+			throws IOException, Exception {
 		// Do not write to a board if a board is not selected properly
 		if (selectedBoard.getName().equals("<NULL BOARD>")) {
 			streamOut.writeUTF(packageMessage(message));
@@ -204,17 +209,18 @@ public class Server {
 	}
 
 	/**
-	 * Bridge method between server and client in order 
-	 * to determine which board the client is trying to 
+	 * Bridge method between server and client in order
+	 * to determine which board the client is trying to
 	 * interact with
 	 * 
-	 * @param boardArr Array of all boards
+	 * @param boardArr  Array of all boards
 	 * @param streamIn
 	 * @param streamOut
 	 * @return
 	 * @throws Exception
 	 */
-	private Board boardSelectServer(ArrayList<Board> boardArr, DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
+	private Board boardSelectServer(ArrayList<Board> boardArr, DataInputStream streamIn, DataOutputStream streamOut)
+			throws Exception {
 		// Construct the string of boards to send
 		String messageToSend = "Select a board:\n";
 		for (int i = 0; i < boardArr.size(); i++) {
@@ -226,9 +232,8 @@ public class Server {
 		streamOut.writeUTF(packagedMsg);
 		streamOut.flush();
 
-
 		Board postBoard = new Board("<NULL BOARD>");
-		
+
 		// User inputs a board to select
 		String selection = decryptMessage(streamIn.readUTF());
 
@@ -239,10 +244,6 @@ public class Server {
 				postBoard = b;
 			}
 		}
-		
-
-
-
 
 		return postBoard;
 	}
@@ -320,12 +321,11 @@ public class Server {
 			return;
 		}
 
-
-		Board edmundsBoard = new Board("edmunds");
-		Board fraryBoard = new Board("frary");
+		// Board edmundsBoard = new Board("edmunds");
+		// Board fraryBoard = new Board("frary");
 		ArrayList<Board> boardArr = new ArrayList<>();
-		boardArr.add(edmundsBoard);
-		boardArr.add(fraryBoard);
+		// boardArr.add(edmundsBoard);
+		// boardArr.add(fraryBoard);
 
 		// Security.addProvider(new
 		// org.bouncycastle.jce.provider.BouncyCastleProvider());
@@ -337,6 +337,24 @@ public class Server {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+
+	private void readBoardFile(String filename) throws IOException, ClassNotFoundException {
+
+		FileInputStream fileInputStream = new FileInputStream(filename);
+		ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
+		@SuppressWarnings("unchecked")
+		ArrayList<Board> blist = (ArrayList<Board>) objectInputStream.readObject();
+		this.boards = blist;
+		objectInputStream.close();
+	}
+
+	private void saveBoards(String filename) throws IOException {
+		FileOutputStream fileOutputStream = new FileOutputStream(filename);
+		ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
+		objectOutputStream.writeObject(this.boards);
+		objectOutputStream.flush();
+		objectOutputStream.close();
 	}
 
 	private String packageMessage(String message) throws Exception {

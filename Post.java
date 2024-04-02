@@ -1,5 +1,6 @@
+import java.io.Serializable;
 
-public class Post {
+public class Post implements Serializable {
     private String uid;
     private String u_name;
     private String boardName;
