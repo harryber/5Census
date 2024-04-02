@@ -1,6 +1,7 @@
+import java.io.Serializable;
 import java.util.ArrayList;
 
-public class Board {
+public class Board implements Serializable {
     private String name;
     private ArrayList<Post> public_posts;
     private ArrayList<Post> local_posts;
@@ -20,10 +21,14 @@ public class Board {
     }
 
     public String viewPublicPosts() {
-        String str = "Posts on " + name + "\n";
-        for (int i = public_posts.size() - 1; i >= 0; i--) {
-            str += public_posts.get(i);
-            str += "\n";
+        String str = name + " board posts:" + "\n";
+        // for (int i = public_posts.size() - 1; i >= 0; i--) {
+        // str += public_posts.get(i);
+        // str += "\n";
+        // }
+
+        for (int i = 0; i < public_posts.size(); i++) {
+            str += public_posts.get(i).getPostContent() + "\n";
         }
 
         return str;
@@ -37,6 +42,10 @@ public class Board {
         }
 
         return str;
+    }
+
+    public String getName() {
+        return name;
     }
 
 }

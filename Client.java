@@ -28,9 +28,14 @@ public class Client {
 	private PublicKey bobKey;
 	private PublicKey bobMacKey;
 	private SecretKey secretKey;
+	private Scanner console;
 
 	public Base64.Encoder encoder = Base64.getEncoder();
 	public Base64.Decoder decoder = Base64.getDecoder();
+
+	public enum UserAction {
+		LOGOUT, VIEW, SUBMIT, DELETE, EDIT
+	}
 
 	public Client(String serverPortStr)
 			throws Exception {
@@ -42,7 +47,7 @@ public class Client {
 		privateMacKey = Gen.readPKCS8PrivateKey(new File("a_macprivate.pem"));
 		bobMacKey = Gen.readPKCS8PublicKey(new File("b_macpublic.pem"));
 
-		Scanner console = new Scanner(System.in);
+		console = new Scanner(System.in);
 		System.out.println("This is Alice");
 
 		// obtain server's port number and connect to it
@@ -55,21 +60,83 @@ public class Client {
 			System.out.println("Connected to Server");
 
 			DataOutputStream streamOut = new DataOutputStream(serverSocket.getOutputStream());
+			DataInputStream streamIn = new DataInputStream(new BufferedInputStream(serverSocket.getInputStream()));
 			streamOut.writeUTF(keyAgreement());
 			streamOut.flush();
 
 			// obtain the message from the user and send it to Server
 			// the communication ends when the user inputs "done"
 			String line = "";
-			while (!line.equals("done")) {
+			String messageToSend = "";
+			String packagedMsg = "";
+			boolean keepLooping = true;
+			boolean logged_in = false;
+			while (keepLooping) {
+				while (!logged_in) {
+					String serverResponse = decryptMessage(streamIn.readUTF());
+					if (serverResponse.equals("Enter username and password (separated by space)")) { // can change this later
+						System.out.println(serverResponse);
+						String credentials = console.nextLine();
+						streamOut.writeUTF(credentials);
+						streamOut.flush();
+
+
+						String authStatus = streamIn.readUTF();
+						if (authStatus.equals("success")) {
+							logged_in = true;
+						} else {
+							System.out.println("Invalid credentials. Please try again.");
+						}
+					}
+
+					continue; // Skip to next iteration
+				}
 				try {
-					System.out.print("Type message: ");
+					System.out.print("\nWhat would you like to do? \n logout \n exit \n view board \n post message\n\n");
 					line = console.nextLine();
 
-					String packagedMsg = packageMessage(line);
-					streamOut.writeUTF(packagedMsg);
-					streamOut.flush();
-					System.out.println("Message sent");
+					switch (line) {
+						case "logout":
+							System.out.println("HAH you thought you could escape?");
+							break;
+						case "exit":
+							keepLooping = false;
+							break;
+						case "view board":
+							// select a board to look at
+							boardSelectClient(streamIn, streamOut);
+
+							// ask server to display a board
+							packagedMsg = packageMessage("<display board>");
+							streamOut.writeUTF(packagedMsg);
+							streamOut.flush();
+	
+							// print the server's response
+							String incomingMsg = decryptMessage(streamIn.readUTF());
+							System.out.println(incomingMsg);
+							break;
+						case "post message":
+							boardSelectClient(streamIn, streamOut);						
+
+							messageToSend = "<post to board>";
+							streamOut.writeUTF(packageMessage(messageToSend));
+							streamOut.flush();
+
+							// if (decryptMessage(streamIn.readUTF()).equals("<board select failed>"))
+
+							System.out.println("What message would you like to post?\n");
+							messageToSend = console.nextLine();
+							packagedMsg = packageMessage(messageToSend);
+							streamOut.writeUTF(packagedMsg);
+							streamOut.flush();
+							// System.out.println("Message sent");
+							break;
+						default:
+							System.out.println("Invalid action");
+							break;
+					}
+
+					
 
 				} catch (IOException ioe) {
 					System.out.println("Sending error: " + ioe.getMessage());
@@ -86,6 +153,25 @@ public class Client {
 			System.out.println("Connection failed due to following reason");
 			System.out.println(e);
 		}
+	}
+
+	private String boardSelectClient(DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
+		try {
+			// send a request to see the board options
+			streamOut.writeUTF(packageMessage("<boards request>"));
+			String boardMsgPrompt = decryptMessage(streamIn.readUTF());
+			// System.out.println("Select a board:\n" + incomingMsg + "\n");
+			System.out.println(boardMsgPrompt);
+			// pick a board
+			String selection = console.nextLine();
+			streamOut.writeUTF(packageMessage(selection));
+			return selection;
+		}
+		catch (IOException ioe) {
+			System.out.println("Could not get boards to select: " + ioe.getMessage());
+			return "";
+		}
+
 	}
 
 	private String packageMessage(String message) throws Exception {
@@ -106,6 +192,18 @@ public class Client {
 		acc.append(Gen.encodeHexString(sign.sign()));
 
 		return acc.toString();
+	}
+
+	public String decryptMessage(String message)
+			throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException,
+			BadPaddingException, InvalidAlgorithmParameterException {
+		String[] tokens = message.split(",");
+		Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+		GCMParameterSpec params = new GCMParameterSpec(128, Gen.decodeHexString(tokens[1]));
+
+		cipher.init(Cipher.DECRYPT_MODE, secretKey, params);
+
+		return new String(cipher.doFinal(Gen.decodeHexString(tokens[0])));
 	}
 
 	private String keyAgreement() throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException,
