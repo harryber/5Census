@@ -61,21 +61,21 @@ public class Server {
 
 		// attempt to create a server with the given port number
 		int portNumber = Integer.parseInt(bobPort);
-			try {
-				System.out.println("Connecting to port " + portNumber + "...");
-				serverSocket = new ServerSocket(portNumber);
-				serverSocket.setReuseAddress(true);
-				System.out.println("Bob Server started at port " + portNumber);
+		try {
+			System.out.println("Connecting to port " + portNumber + "...");
+			serverSocket = new ServerSocket(portNumber);
+			serverSocket.setReuseAddress(true);
+			System.out.println("Bob Server started at port " + portNumber);
 
-			} catch (IOException e) {
-				// print error if the server fails to create itself
-				System.out.println("Error in creating the server");
-				System.out.println(e);
-			}
+		} catch (IOException e) {
+			// print error if the server fails to create itself
+			System.out.println("Error in creating the server");
+			System.out.println(e);
+		}
 
-			// clean up the connections before closing
-//			serverSocket.close();
-//			System.out.println("Bob closed");
+		// clean up the connections before closing
+		// serverSocket.close();
+		// System.out.println("Bob closed");
 
 	}
 
@@ -99,15 +99,15 @@ public class Server {
 		private DataInputStream streamIn;
 		private DataOutputStream streamOut;
 
-		public ClientHandler(Socket socket){
+		public ClientHandler(Socket socket) {
 			this.clientSocket = socket;
 			try {
 				streamIn = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
 				streamOut = new DataOutputStream(clientSocket.getOutputStream());
 			} catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+				e.printStackTrace();
+			}
+		}
 
 		@Override
 		public void run() {
@@ -136,14 +136,14 @@ public class Server {
 				}
 			} catch (SocketException e) {
 				System.out.println("Client connection closed unexpectedly");
-			} catch (IOException | NoSuchAlgorithmException | InvalidKeyException | SignatureException |
-                     NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException e) {
+			} catch (IOException | NoSuchAlgorithmException | InvalidKeyException | SignatureException
+					| NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException e) {
 				System.out.println("IO Exception occurred: " + e.getMessage());
 			} catch (InvalidAlgorithmParameterException e) {
-                throw new RuntimeException(e);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            } finally {
+				throw new RuntimeException(e);
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			} finally {
 				// clean up client if connection closed
 				try {
 					clientSocket.close();
@@ -154,6 +154,7 @@ public class Server {
 				}
 			}
 		}
+
 		private void authenticateUser(DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
 			while (true) {
 				String messageToSend = "Enter username and password (separated by space)";
@@ -175,7 +176,8 @@ public class Server {
 			}
 		}
 
-		private void processMessage(String decryptedMsg, DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
+		private void processMessage(String decryptedMsg, DataInputStream streamIn, DataOutputStream streamOut)
+				throws Exception {
 
 			switch (decryptedMsg) {
 				case "<post to board>":
@@ -186,32 +188,32 @@ public class Server {
 						break;
 
 						// } else {
-						// 	streamOut.writeUTF("<board select success>");
-						// 	streamOut.flush();
+						// streamOut.writeUTF("<board select success>");
+						// streamOut.flush();
 					}
 
 					String incomingMsg = streamIn.readUTF();
 					if (verifyMessage(incomingMsg)) {
 						String postContents = decryptMessage(incomingMsg);
 
-
 						Post newPost = new Post(selectedBoard.getName(), postContents);
 						selectedBoard.addPost(newPost);
 						System.out.println(selectedBoard.getName() + ": " + selectedBoard.viewPublicPosts());
-					}  else {
+					} else {
 						System.out.println("Signature Verification Failed");
 						// finished = true;
 					}
 
 					break;
 				case "<boards request>":
-//					System.out.println(streamIn.readUTF());
+					// System.out.println(streamIn.readUTF());
 					selectedBoard = boardSelectServer(boardArr, streamIn, streamOut);
 					break;
 				case "<display board>":
-//					System.out.println(streamIn.readUTF());
+					// System.out.println(streamIn.readUTF());
 					if (checkForErrorBoardSelection(selectedBoard, streamOut,
-							"Error displaying board, selected board invalid.")) break;
+							"Error displaying board, selected board invalid."))
+						break;
 					String boardContents = selectedBoard.viewPublicPosts();
 					streamOut.writeUTF(packageMessage(boardContents));
 					break;
@@ -221,8 +223,8 @@ public class Server {
 		}
 	}
 
-
-	private boolean checkForErrorBoardSelection(Board selectedBoard, DataOutputStream streamOut, String message) throws IOException, Exception {
+	private boolean checkForErrorBoardSelection(Board selectedBoard, DataOutputStream streamOut, String message)
+			throws IOException, Exception {
 		// Do not write to a board if a board is not selected properly
 		if (selectedBoard.getName().equals("<NULL BOARD>")) {
 			streamOut.writeUTF(packageMessage(message));
@@ -345,7 +347,9 @@ public class Server {
 		}
 
 		HashMap<String, String> loginMap = new HashMap<String, String>();
-		loginMap.put("Steve", "12345"); loginMap.put("Alice", "321"); loginMap.put("Irwin", "password!");
+		loginMap.put("Steve", "12345");
+		loginMap.put("Alice", "321");
+		loginMap.put("Irwin", "password!");
 
 		Board edmundsBoard = new Board("edmunds");
 		Board fraryBoard = new Board("frary");
@@ -387,6 +391,10 @@ public class Server {
 	private String packageMessage(String message) throws Exception {
 		StringBuilder acc = new StringBuilder();
 
+		Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+		cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+		GCMParameterSpec spec = cipher.getParameters().getParameterSpec(GCMParameterSpec.class);
+
 		acc.append(Gen.encodeHexString(cipher.doFinal(message.getBytes())));
 		acc.append(",");
 		acc.append(Gen.encodeHexString(spec.getIV()));
@@ -400,4 +408,3 @@ public class Server {
 		return acc.toString();
 	}
 }
-
