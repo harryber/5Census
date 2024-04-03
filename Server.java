@@ -1,7 +1,13 @@
 
+import org.springframework.security.crypto.bcrypt.BCrypt;
+import com.mongodb.client.MongoClients;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import org.bson.Document;
+
 import java.io.*;
 import java.net.*;
-import java.nio.file.Path;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -40,10 +46,14 @@ public class Server {
 	public Base64.Decoder decoder = Base64.getDecoder();
 
 	public ArrayList<Board> boardArr;
-	public HashMap<String, String> loginMap;
 	public Board selectedBoard;
 
-	public Server(String bobPort, HashMap<String, String> loginMap, ArrayList<Board> boardArr) throws Exception {
+	private static final String DB_NAME = "database";
+	private static final String COLLECTION_NAME = "users";
+
+    private MongoCollection<Document> collection;
+
+	public Server(String bobPort, MongoCollection<Document> collection, ArrayList<Board> boardArr) throws Exception {
 
 		publicKey = Gen.readPKCS8PublicKey(new File("b_public.pem"));
 		privateKey = Gen.readPKCS8PrivateKey(new File("b_private.pem"));
@@ -52,9 +62,8 @@ public class Server {
 		publicMacKey = Gen.readPKCS8PublicKey(new File("b_macpublic.pem"));
 		privateMacKey = Gen.readPKCS8PrivateKey(new File("b_macprivate.pem"));
 		aliceMacKey = Gen.readPKCS8PublicKey(new File("a_macpublic.pem"));
-		this.loginMap = loginMap;
 		readBoardFile("boards.txt");
-
+		this.collection = collection;
 		// notify the identity of the server to the user
 		System.out.println("This is Bob");
 
@@ -156,21 +165,47 @@ public class Server {
 
 		private void authenticateUser(DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
 			while (true) {
-				String messageToSend = "Enter username and password (separated by space)";
+				String messageToSend = "Enter username and password (separated by space), or enter 1 to create an account";
 				streamOut.writeUTF(packageMessage(messageToSend));
 				streamOut.flush();
-				String credentials = streamIn.readUTF();
-				String[] parts = credentials.split(" ");
-				String username = parts[0];
-				String password = parts[1];
+				String signInOrRegister = streamIn.readUTF();
+				System.out.println(signInOrRegister);
+				// Attempt to authenticate user
 
-				if (loginMap.containsKey(username) && loginMap.get(username).equals(password)) {
-					streamOut.writeUTF("success");
-					streamOut.flush();
-					return;
-				} else {
+				if (!signInOrRegister.equals("1")) {
+					String credentials = signInOrRegister;
+					String[] parts = credentials.split(" ");
+					String username = parts[0];
+					String password = parts[1];
+					Document query = new Document("username", username);
+					Document user = collection.find(query).first();
+					if (user != null) {
+						String hashedPassword = user.getString("password");
+						// Check if the entered password matches the stored hashed password
+						if (BCrypt.checkpw(password, hashedPassword)) {
+							System.out.println("User logged in successfully");
+							streamOut.writeUTF("success");
+							streamOut.flush();
+							break;
+						}
+					}
+					System.out.println("User not found or invalid credentials."); // Better handling needed
 					streamOut.writeUTF("failure");
 					streamOut.flush();
+				} else {
+					String newUserCredentials = streamIn.readUTF();
+					String[] parts = newUserCredentials.split(" ");
+					String username = parts[0];
+					String password = parts[1];
+
+					String salt = BCrypt.gensalt();
+					String hashedPassword = BCrypt.hashpw(password, salt);
+
+					Document user = new Document("username", username).append("password", hashedPassword).append("salt", salt);
+					collection.insertOne(user);
+					streamOut.writeUTF("success");
+					streamOut.flush();
+					break;
 				}
 			}
 		}
@@ -345,23 +380,17 @@ public class Server {
 			return;
 		}
 
-		HashMap<String, String> loginMap = new HashMap<String, String>();
-		loginMap.put("Steve", "12345");
-		loginMap.put("Alice", "321");
-		loginMap.put("Irwin", "password!");
+		String connectionString = "mongodb+srv://cdv1:TrSLjmjeLmgkYPBm@cluster0.gqjf9pj.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+		MongoClient mongoClient = MongoClients.create(connectionString);
+        MongoDatabase database = mongoClient.getDatabase(DB_NAME);
+		MongoCollection<Document> collection = database.getCollection(COLLECTION_NAME);
 
-		Board edmundsBoard = new Board("edmunds");
-		Board fraryBoard = new Board("frary");
 		ArrayList<Board> boardArr = new ArrayList<>();
-		// boardArr.add(edmundsBoard);
-		// boardArr.add(fraryBoard);
 
-		// Security.addProvider(new
-		// org.bouncycastle.jce.provider.BouncyCastleProvider());
 
 		// create Bob
 		try {
-			Server bob = new Server(args[0], loginMap, boardArr);
+			Server bob = new Server(args[0],collection, boardArr);
 			bob.start();
 		} catch (Exception e) {
 			// TODO Auto-generated catch block

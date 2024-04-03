@@ -75,23 +75,30 @@ public class Client {
 			while (keepLooping) {
 				while (!logged_in) {
 					String serverResponse = decryptMessage(streamIn.readUTF());
-					if (serverResponse.equals("Enter username and password (separated by space)")) { // can change this later
-						System.out.println(serverResponse);
-						String credentials = console.nextLine();
+					System.out.println(serverResponse);
+					String credentials = console.nextLine();
+					streamOut.writeUTF(credentials);
+					streamOut.flush();
+
+					if (credentials.equals("1")) {
+						System.out.println("Enter new username and password separated by space"); // TODO: add check for formatting
+						credentials = console.nextLine();
 						streamOut.writeUTF(credentials);
 						streamOut.flush();
-
-
-						String authStatus = streamIn.readUTF();
-						if (authStatus.equals("success")) {
-							logged_in = true;
-						} else {
-							System.out.println("Invalid credentials. Please try again.");
-						}
+						break;
 					}
 
-					continue; // Skip to next iteration
+					String authStatus = streamIn.readUTF();
+					if (authStatus.equals("success")) {
+						logged_in = true;
+					} else {
+						System.out.println("Failed to create account or log in. Please try again.");
+					}
+
+
+
 				}
+
 				try {
 					System.out.print("\nWhat would you like to do? \n logout \n exit \n view board \n post message\n\n");
 					line = console.nextLine();
@@ -268,3 +275,4 @@ public class Client {
 
 	}
 }
+
