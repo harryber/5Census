@@ -382,7 +382,7 @@ public class Server {
 	private void saveBoards(String filename) throws IOException {
 		FileOutputStream fileOutputStream = new FileOutputStream(filename);
 		ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
-		objectOutputStream.writeObject(this.boards);
+		objectOutputStream.writeObject(this.boardArr);
 		objectOutputStream.flush();
 		objectOutputStream.close();
 	}
