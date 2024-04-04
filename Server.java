@@ -168,13 +168,18 @@ public class Server {
 				String messageToSend = "Enter username and password (separated by space), or enter 1 to create an account";
 				streamOut.writeUTF(packageMessage(messageToSend));
 				streamOut.flush();
-				String signInOrRegister = streamIn.readUTF();
-				System.out.println(signInOrRegister);
-				// Attempt to authenticate user
+				String signInOrRegister = decryptMessage(streamIn.readUTF());
 
+				// Attempt to authenticate user
 				if (!signInOrRegister.equals("1")) {
 					String credentials = signInOrRegister;
-					String[] parts = credentials.split(" ");
+
+					String[] parts = credentials.split("\\s+");
+					if (parts.length != 2){
+						streamOut.writeUTF("failure");
+						streamOut.flush();
+						continue;
+					}
 					String username = parts[0];
 					String password = parts[1];
 					Document query = new Document("username", username);
@@ -184,28 +189,39 @@ public class Server {
 						// Check if the entered password matches the stored hashed password
 						if (BCrypt.checkpw(password, hashedPassword)) {
 							System.out.println("User logged in successfully");
-							streamOut.writeUTF("success");
+							streamOut.writeUTF(packageMessage("success"));
 							streamOut.flush();
 							break;
 						}
 					}
-					System.out.println("User not found or invalid credentials."); // Better handling needed
-					streamOut.writeUTF("failure");
+					System.out.println("User not found or invalid credentials.");
+					// TODO: better handling if user exists, "forgot password" option
+					streamOut.writeUTF(packageMessage("failure"));
 					streamOut.flush();
-				} else {
-					String newUserCredentials = streamIn.readUTF();
-					String[] parts = newUserCredentials.split(" ");
+				} else { // add new user to db
+					String newUserCredentials = decryptMessage(streamIn.readUTF());
+					String[] parts = newUserCredentials.split("\\s+");
 					String username = parts[0];
 					String password = parts[1];
 
-					String salt = BCrypt.gensalt();
-					String hashedPassword = BCrypt.hashpw(password, salt);
+					// check if username is taken
+					Document existingUser = collection.find(new Document("username", username)).first();
+					if (existingUser != null) {
+						streamOut.writeUTF(packageMessage("failure"));
+						streamOut.flush();
 
-					Document user = new Document("username", username).append("password", hashedPassword).append("salt", salt);
-					collection.insertOne(user);
-					streamOut.writeUTF("success");
-					streamOut.flush();
-					break;
+					} else {
+
+						String salt = BCrypt.gensalt();
+						String hashedPassword = BCrypt.hashpw(password, salt);
+
+						Document user = new Document("username", username).append("password", hashedPassword).append("salt", salt);
+						collection.insertOne(user);
+						System.out.println("New account created");
+						streamOut.writeUTF(packageMessage("success"));
+						streamOut.flush();
+						break;
+					}
 				}
 			}
 		}

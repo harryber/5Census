@@ -7,6 +7,7 @@ import java.util.Scanner;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.regex.*;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -64,7 +65,7 @@ public class Client {
 			DataInputStream streamIn = new DataInputStream(new BufferedInputStream(serverSocket.getInputStream()));
 			streamOut.writeUTF(keyAgreement());
 			streamOut.flush();
-
+			// todo: authenticate server to user
 			// obtain the message from the user and send it to Server
 			// the communication ends when the user inputs "done"
 			String line = "";
@@ -77,23 +78,56 @@ public class Client {
 					String serverResponse = decryptMessage(streamIn.readUTF());
 					System.out.println(serverResponse);
 					String credentials = console.nextLine();
-					streamOut.writeUTF(credentials);
+
+					streamOut.writeUTF(packageMessage(credentials));
 					streamOut.flush();
 
+
+					// Username requirements: Alphanumeric, length between 4 and 16
+					Pattern usernamePattern = Pattern.compile("^[a-zA-Z0-9]{4,16}$");
+					// Password requirements: length between 8 and 32, include a symbol or number, one capital
+					Pattern passwordPattern = Pattern.compile("^(?=.*[0-9!@#$%^&*()])(?=.*[A-Z]).{8,32}$");
+
 					if (credentials.equals("1")) {
-						System.out.println("Enter new username and password separated by space"); // TODO: add check for formatting
-						credentials = console.nextLine();
-						streamOut.writeUTF(credentials);
+						boolean validCredentials = false;
+						while (!validCredentials) {
+							System.out.println("Enter new username and password separated by space");
+							System.out.println("Username requirements: Alphanumeric, length between 4 and 16");
+							System.out.println("Password requirements: length between 8 and 32, include a symbol or number, one capital");
+							credentials = console.nextLine();
+
+							String[] parts = credentials.split("\\s+");
+							if (parts.length != 2) {
+								System.out.println("Invalid input format. Please enter username and password separated by space.");
+								continue;
+							}
+
+							String username = parts[0];
+							String password = parts[1];
+
+							Matcher usernameMatcher = usernamePattern.matcher(username);
+							Matcher passwordMatcher = passwordPattern.matcher(password);
+
+							if (!usernameMatcher.matches() || !passwordMatcher.matches()) {
+								System.out.println("Failed to meet username or password requirements."); // this is bad. tells you if you didnt enter a properly formatted password
+							} else {
+								validCredentials = true;
+							}
+						}
+
+
+
+						streamOut.writeUTF(packageMessage(credentials));
 						streamOut.flush();
-						break;
 					}
 
-					String authStatus = streamIn.readUTF();
+					String authStatus = decryptMessage(streamIn.readUTF());
 					if (authStatus.equals("success")) {
 						logged_in = true;
+						System.out.println("Logged in");
 					} else {
-						System.out.println("Failed to create account or log in. Please try again.");
-					}
+						System.out.println("Failed to create account or log in (username may be taken). Please try again.");
+                    }
 
 
 
