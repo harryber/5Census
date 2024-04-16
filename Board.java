@@ -3,11 +3,13 @@ import java.util.ArrayList;
 
 public class Board implements Serializable {
     private String name;
+    private String college;
     private ArrayList<Post> public_posts;
     private ArrayList<Post> local_posts;
 
-    public Board(String board_name) {
+    public Board(String board_name, String board_college) {
         name = board_name;
+        college = board_college;
         public_posts = new ArrayList<Post>();
         local_posts = new ArrayList<Post>();
     }
@@ -46,6 +48,10 @@ public class Board implements Serializable {
 
     public String getName() {
         return name;
+    }
+
+    public String getCollege() {
+        return college;
     }
 
 }

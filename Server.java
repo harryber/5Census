@@ -47,11 +47,13 @@ public class Server {
 
 	public ArrayList<Board> boardArr;
 	public Board selectedBoard;
+	public HashMap<String, User> users;
+	public User currentUser;
 
 	private static final String DB_NAME = "database";
 	private static final String COLLECTION_NAME = "users";
 
-    private MongoCollection<Document> collection;
+	private MongoCollection<Document> collection;
 
 	public Server(String bobPort, MongoCollection<Document> collection, ArrayList<Board> boardArr) throws Exception {
 
@@ -175,7 +177,7 @@ public class Server {
 					String credentials = signInOrRegister;
 
 					String[] parts = credentials.split("\\s+");
-					if (parts.length != 2){
+					if (parts.length != 2) {
 						streamOut.writeUTF("failure");
 						streamOut.flush();
 						continue;
@@ -215,7 +217,8 @@ public class Server {
 						String salt = BCrypt.gensalt();
 						String hashedPassword = BCrypt.hashpw(password, salt);
 
-						Document user = new Document("username", username).append("password", hashedPassword).append("salt", salt);
+						Document user = new Document("username", username).append("password", hashedPassword)
+								.append("salt", salt);
 						collection.insertOne(user);
 						System.out.println("New account created");
 						streamOut.writeUTF(packageMessage("success"));
@@ -277,6 +280,17 @@ public class Server {
 			throws IOException, Exception {
 		// Do not write to a board if a board is not selected properly
 		if (selectedBoard.getName().equals("<NULL BOARD>")) {
+			streamOut.writeUTF(packageMessage(message));
+			streamOut.flush();
+			return true;
+		}
+		return false;
+	}
+
+	private boolean checkForBoardAuthorization(Board selectedBoard, DataOutputStream streamOut, String message)
+			throws IOException, Exception {
+		// Do not allow access if user not apart of the board's college
+		if (selectedBoard.getCollege().equals("<NULL BOARD>")) {
 			streamOut.writeUTF(packageMessage(message));
 			streamOut.flush();
 			return true;
@@ -398,15 +412,14 @@ public class Server {
 
 		String connectionString = "mongodb+srv://cdv1:TrSLjmjeLmgkYPBm@cluster0.gqjf9pj.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
 		MongoClient mongoClient = MongoClients.create(connectionString);
-        MongoDatabase database = mongoClient.getDatabase(DB_NAME);
+		MongoDatabase database = mongoClient.getDatabase(DB_NAME);
 		MongoCollection<Document> collection = database.getCollection(COLLECTION_NAME);
 
 		ArrayList<Board> boardArr = new ArrayList<>();
 
-
 		// create Bob
 		try {
-			Server bob = new Server(args[0],collection, boardArr);
+			Server bob = new Server(args[0], collection, boardArr);
 			bob.start();
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
