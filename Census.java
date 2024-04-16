@@ -8,6 +8,7 @@ public class Census {
 
     public Census(String boardFile, Path userFile) {
         loadBoards();
+        loadUsers();
 
     }
 
@@ -42,10 +43,27 @@ public class Census {
         objectInputStream.close();
     }
 
-    private void saveBoards(String filename) throws IOException {
+    private loadUsers(String userFile){
+        FileInputStream fileInputStream = new FileInputStream(filename);
+        ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
+        @SuppressWarnings("unchecked")
+        HashMap<String, User> ulist = (HashMap<String, User>) objectInputStream.readObject();
+        this.users = ulist;
+        objectInputStream.close();
+    }
+
+    public void saveBoards(String filename) throws IOException {
         FileOutputStream fileOutputStream = new FileOutputStream(filename);
         ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
         objectOutputStream.writeObject(this.boards);
+        objectOutputStream.flush();
+        objectOutputStream.close();
+    }
+
+    public void saveUsers(String filename) {
+        FileOutputStream fileOutputStream = new FileOutputStream(filename);
+        ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
+        objectOutputStream.writeObject(this.users);
         objectOutputStream.flush();
         objectOutputStream.close();
     }
