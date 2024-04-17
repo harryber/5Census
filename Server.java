@@ -45,7 +45,7 @@ public class Server {
 	public Base64.Encoder encoder = Base64.getEncoder();
 	public Base64.Decoder decoder = Base64.getDecoder();
 
-	public ArrayList<Board> boardArr;
+	public ArrayList<Board> boardArr = new ArrayList<>();
 	public Board selectedBoard;
 	public HashMap<String, User> users;
 	public User currentUser;
@@ -64,7 +64,25 @@ public class Server {
 		publicMacKey = Gen.readPKCS8PublicKey(new File("b_macpublic.pem"));
 		privateMacKey = Gen.readPKCS8PrivateKey(new File("b_macprivate.pem"));
 		aliceMacKey = Gen.readPKCS8PublicKey(new File("a_macpublic.pem"));
-		readBoardFile("boards.txt");
+
+		// try to read the board state.
+		// if it does not work, then wipe (manually for now) and restart board state with default board
+		try {
+			System.out.println("Boards read properly");
+			readBoardFile("boards.txt");
+		}
+		catch (Exception e) {
+			System.out.println("Boards did not read properly. Creating default board.");
+			Board defaultBoard = new Board("edmunds", "po");
+			Post defaultPost = new Post("edmunds", "Welcome to edmunds!");
+			defaultBoard.addPost(defaultPost);
+			this.boardArr.add(defaultBoard);
+			System.out.println(this.boardArr.get(0).getName());
+			saveBoards("boards.txt");
+			readBoardFile("boards.txt");
+		}
+
+//		readBoardFile("boards.txt");
 		this.collection = collection;
 		// notify the identity of the server to the user
 		System.out.println("This is Bob");
@@ -213,12 +231,12 @@ public class Server {
 						streamOut.flush();
 
 					} else {
-
+						String schoolAffiliation = decryptMessage(streamIn.readUTF());
 						String salt = BCrypt.gensalt();
 						String hashedPassword = BCrypt.hashpw(password, salt);
 
 						Document user = new Document("username", username).append("password", hashedPassword)
-								.append("salt", salt);
+								.append("salt", salt).append("schoolAffiliation", schoolAffiliation);
 						collection.insertOne(user);
 						System.out.println("New account created");
 						streamOut.writeUTF(packageMessage("success"));
@@ -252,6 +270,8 @@ public class Server {
 						Post newPost = new Post(selectedBoard.getName(), postContents);
 						selectedBoard.addPost(newPost);
 						System.out.println(selectedBoard.getName() + ": " + selectedBoard.viewPublicPosts());
+
+						saveBoards("boards.txt");
 					} else {
 						System.out.println("Signature Verification Failed");
 						// finished = true;
@@ -311,22 +331,24 @@ public class Server {
 	 */
 	private Board boardSelectServer(ArrayList<Board> boardArr, DataInputStream streamIn, DataOutputStream streamOut)
 			throws Exception {
+		System.out.println("Board select server...");
 		// Construct the string of boards to send
 		String messageToSend = "Select a board:\n";
 		for (int i = 0; i < boardArr.size(); i++) {
 			messageToSend += i + ": " + boardArr.get(i).getName() + "\n";
 		}
-
+		System.out.println("found all board names");
 		// Send the boards to the client
 		String packagedMsg = packageMessage(messageToSend);
 		streamOut.writeUTF(packagedMsg);
 		streamOut.flush();
 
 		Board postBoard = new Board("<NULL BOARD>", "<NULL COLLEGE>");
+//		Board postBoard = new Board("<NULL BOARD>");
 
 		// User inputs a board to select
 		String selection = decryptMessage(streamIn.readUTF());
-
+		System.out.println("recieved a board selection...");
 		// Confirm that the selected board actually exists
 
 		for (Board b : boardArr) {
@@ -334,6 +356,7 @@ public class Server {
 				postBoard = b;
 			}
 		}
+
 		return postBoard;
 	}
 
@@ -428,21 +451,29 @@ public class Server {
 	}
 
 	private void readBoardFile(String filename) throws IOException, ClassNotFoundException {
-
+		System.out.println("Reading Board file...");
 		FileInputStream fileInputStream = new FileInputStream(filename);
 		ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
+		//
 		@SuppressWarnings("unchecked")
 		ArrayList<Board> blist = (ArrayList<Board>) objectInputStream.readObject();
 		this.boardArr = blist;
 		objectInputStream.close();
+		fileInputStream.close();
+		System.out.println("Board file read successfully...");
 	}
 
 	private void saveBoards(String filename) throws IOException {
+		System.out.println("Saving Board file...");
 		FileOutputStream fileOutputStream = new FileOutputStream(filename);
 		ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
+		System.out.println(this.boardArr.get(0));
 		objectOutputStream.writeObject(this.boardArr);
 		objectOutputStream.flush();
 		objectOutputStream.close();
+		fileOutputStream.close();
+		System.out.println("Board file saved successfully...");
+
 	}
 
 	private String packageMessage(String message) throws Exception {

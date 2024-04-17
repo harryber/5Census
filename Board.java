@@ -54,4 +54,8 @@ public class Board implements Serializable {
         return college;
     }
 
+    public static void main(String[] args) {
+        System.out.println("I exist to compile");
+    }
+
 }
