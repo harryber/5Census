@@ -114,11 +114,33 @@ public class Client {
 								validCredentials = true;
 							}
 						}
-
-
-
 						streamOut.writeUTF(packageMessage(credentials));
 						streamOut.flush();
+
+
+
+						// Select a college
+						boolean validCollege = false;
+						String schoolAffiliation = "";
+						while (!validCollege) {
+							System.out.println("Which college do you belong to? [PO, HMC, CMC, PZ, SC]");
+							schoolAffiliation = console.nextLine();
+							schoolAffiliation = schoolAffiliation.toLowerCase();
+							if (schoolAffiliation.equals("po") || schoolAffiliation.equals("hmc") || schoolAffiliation.equals("cmc") ||
+									schoolAffiliation.equals("pz") || schoolAffiliation.equals("sc")) {
+
+								validCollege = true;
+							}
+							else {
+								System.out.println("Invalid school selection");
+							}
+						}
+
+						streamOut.writeUTF(packageMessage(schoolAffiliation));
+						streamOut.flush();
+
+
+
 					}
 
 					String authStatus = decryptMessage(streamIn.readUTF());

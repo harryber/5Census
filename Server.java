@@ -213,12 +213,16 @@ public class Server {
 						streamOut.flush();
 
 					} else {
+						String schoolAffiliation = decryptMessage(streamIn.readUTF());
 
 						String salt = BCrypt.gensalt();
 						String hashedPassword = BCrypt.hashpw(password, salt);
 
+//						Document user = new Document("username", username).append("password", hashedPassword)
+//								.append("salt", salt).append("schoolAffiliation", schoolAffiliation);
 						Document user = new Document("username", username).append("password", hashedPassword)
-								.append("salt", salt);
+							.append("salt", salt);
+
 						collection.insertOne(user);
 						System.out.println("New account created");
 						streamOut.writeUTF(packageMessage("success"));
