@@ -1,41 +1,58 @@
 import java.io.Serializable;
-
+import java.io.*;
+import java.net.*;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.Signature;
+import java.security.SignatureException;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashMap;
 public class User implements Serializable {
-    private String user_name;
+    private String userName;
     private String college;
     private String email;
     private boolean verifed;
     private ArrayList<Post> posts;
 
     public User(String name, String collegeMember, String user_mail) {
-        user_name = name;
+        userName = name;
         college = collegeMember;
         email = user_mail;
         posts = new ArrayList<Post>();
         verifed = false;
     }
 
-    public addPost(Post newPost){
+    public void addPost(Post newPost){
         posts.add(newPost);
     }
 
-    public resetPassword(){
+    public void resetPassword(){
 //RESET PASSWORD USING EMAIL
     }
 
-    public verifyMail(){
+    public void verifyMail(){
         // ADD EMAIL VERIFICATION
     }
 
-    public getCollege(){
+    public String getCollege(){
         return college;
     }
 
-    public getName(){
-        return name;
+    public String getName(){
+        return userName;
     }
 
-    public isVerifed(){
+    public boolean isVerifed(){
         return verifed;
+    }
+
+    public static void main(String[] args) {
+        System.out.println("I exist to compile");
     }
 }

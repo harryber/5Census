@@ -322,7 +322,7 @@ public class Server {
 		streamOut.writeUTF(packagedMsg);
 		streamOut.flush();
 
-		Board postBoard = new Board("<NULL BOARD>");
+		Board postBoard = new Board("<NULL BOARD>", "<NULL COLLEGE>");
 
 		// User inputs a board to select
 		String selection = decryptMessage(streamIn.readUTF());
