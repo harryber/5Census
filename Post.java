@@ -50,3 +50,4 @@ public class Post implements Serializable {
         return str;
     }
 }
+

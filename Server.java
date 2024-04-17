@@ -1,4 +1,5 @@
 
+import com.mongodb.client.model.Filters;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoClient;
@@ -20,6 +21,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -45,13 +47,14 @@ public class Server {
 	public Base64.Encoder encoder = Base64.getEncoder();
 	public Base64.Decoder decoder = Base64.getDecoder();
 
-	public ArrayList<Board> boardArr = new ArrayList<>();
+	public ArrayList<Board> boardArr = loadBoards();
 	public Board selectedBoard;
 	public HashMap<String, User> users;
 	public User currentUser;
 
 	private static final String DB_NAME = "database";
 	private static final String COLLECTION_NAME = "users";
+	private static final String BOARDS_NAME = "users";
 
 	private MongoCollection<Document> collection;
 
@@ -65,25 +68,9 @@ public class Server {
 		privateMacKey = Gen.readPKCS8PrivateKey(new File("b_macprivate.pem"));
 		aliceMacKey = Gen.readPKCS8PublicKey(new File("a_macpublic.pem"));
 
-		// try to read the board state.
-		// if it does not work, then wipe (manually for now) and restart board state with default board
-		try {
-			System.out.println("Boards read properly");
-			readBoardFile("boards.txt");
-		}
-		catch (Exception e) {
-			System.out.println("Boards did not read properly. Creating default board.");
-			Board defaultBoard = new Board("edmunds", "po");
-			Post defaultPost = new Post("edmunds", "Welcome to edmunds!");
-			defaultBoard.addPost(defaultPost);
-			this.boardArr.add(defaultBoard);
-			System.out.println(this.boardArr.get(0).getName());
-			saveBoards("boards.txt");
-			readBoardFile("boards.txt");
-		}
-
-//		readBoardFile("boards.txt");
 		this.collection = collection;
+
+
 		// notify the identity of the server to the user
 		System.out.println("This is Bob");
 
@@ -270,8 +257,9 @@ public class Server {
 						Post newPost = new Post(selectedBoard.getName(), postContents);
 						selectedBoard.addPost(newPost);
 						System.out.println(selectedBoard.getName() + ": " + selectedBoard.viewPublicPosts());
-
-						saveBoards("boards.txt");
+						postToBoard(selectedBoard.getName(), newPost);
+//						saveBoard(selectedBoard);
+//						saveBoards("boards.txt");
 					} else {
 						System.out.println("Signature Verification Failed");
 						// finished = true;
@@ -288,7 +276,10 @@ public class Server {
 							"Error displaying board, selected board invalid."))
 						break;
 					String boardContents = selectedBoard.viewPublicPosts();
-					streamOut.writeUTF(packageMessage(boardContents));
+					ArrayList<Post> posts = getPublicPosts(selectedBoard.getName());
+//					streamOut.writeUTF(packageMessage(boardContents));
+					streamOut.writeUTF(packageMessage(posts.toString()));
+
 					break;
 				default:
 					break;
@@ -422,6 +413,168 @@ public class Server {
 		return true;
 	}
 
+	public static Board createBoard(String boardName, String boardCollege) {
+		return new Board(boardName, boardCollege);
+	}
+
+	public static void saveBoard(Board board) {
+		try (var mongoClient = MongoClients.create("mongodb+srv://cdv1:TrSLjmjeLmgkYPBm@cluster0.gqjf9pj.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")) {
+			MongoDatabase database = mongoClient.getDatabase("database");
+			MongoCollection<Document> collection = database.getCollection("boards");
+
+			Document existingBoard = collection.find(Filters.eq("name", board.getName())).first();
+			if (existingBoard != null) {
+				// Board already exists, update it
+				Document updateQuery = new Document("$set", new Document()
+						.append("college", board.getCollege())
+						.append("publicPosts", postsToDocuments(board.getPublicPosts()))
+						.append("localPosts", postsToDocuments(board.getLocalPosts())));
+				collection.updateOne(Filters.eq("name", board.getName()), updateQuery);
+				System.out.println("Board updated: " + board.getName());
+			} else {
+				// Board doesn't exist, insert it
+				Document boardDoc = new Document()
+						.append("name", board.getName())
+						.append("college", board.getCollege())
+						.append("publicPosts", postsToDocuments(board.getPublicPosts()))
+						.append("localPosts", postsToDocuments(board.getLocalPosts()));
+				collection.insertOne(boardDoc);
+				System.out.println("Board saved: " + board.getName());
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void postToBoard(String boardName, Post post) {
+		try (var mongoClient = MongoClients.create("mongodb+srv://cdv1:TrSLjmjeLmgkYPBm@cluster0.gqjf9pj.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")) {
+			MongoDatabase database = mongoClient.getDatabase("database");
+			MongoCollection<Document> collection = database.getCollection("boards");
+
+			// Query the board from the database
+			Document query = new Document("name", boardName);
+			Document boardDoc = collection.find(query).first();
+
+			if (boardDoc != null) {
+				// Retrieve existing public posts from the board document
+				List<Document> publicPostsDocs = (List<Document>) boardDoc.get("publicPosts");
+				ArrayList<Post> publicPosts = new ArrayList<>();
+				if (publicPostsDocs != null) {
+					// Convert existing public posts documents to Post objects
+					for (Document publicPostDoc : publicPostsDocs) {
+						String title = publicPostDoc.getString("title");
+						String content = publicPostDoc.getString("content");
+						publicPosts.add(new Post(title, content));
+					}
+				}
+
+				// Add the new post to the list of public posts
+				publicPosts.add(post);
+
+				// Update the board document with the updated list of public posts
+				Document updateQuery = new Document("$set", new Document("publicPosts", postsToDocuments(publicPosts)));
+				collection.updateOne(query, updateQuery);
+			} else {
+				System.out.println("Board not found: " + boardName);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public static ArrayList<Post> getPublicPosts(String boardName) {
+		ArrayList<Post> publicPosts = new ArrayList<>();
+		try (var mongoClient = MongoClients.create("mongodb+srv://cdv1:TrSLjmjeLmgkYPBm@cluster0.gqjf9pj.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")) {
+			MongoDatabase database = mongoClient.getDatabase("database");
+			MongoCollection<Document> collection = database.getCollection("boards");
+
+			Document query = new Document("name", boardName);
+			Document boardDoc = collection.find(query).first();
+
+			if (boardDoc != null) {
+				List<Document> publicPostsDocs = (List<Document>) boardDoc.get("publicPosts");
+				if (publicPostsDocs != null) {
+					for (Document postDoc : publicPostsDocs) {
+						String title = postDoc.getString("title");
+						String content = postDoc.getString("content");
+						publicPosts.add(new Post(title, content));
+					}
+				} else {
+					System.out.println("No public posts found for board: " + boardName);
+				}
+			} else {
+				System.out.println("Board not found: " + boardName);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return publicPosts;
+	}
+
+	private static List<Document> postsToDocuments(ArrayList<Post> posts) {
+		List<Document> documents = new ArrayList<>();
+		for (Post post : posts) {
+			Document postDoc = new Document()
+					.append("title", "todo")
+					.append("content", post.getPostContent());
+			documents.add(postDoc);
+		}
+		return documents;
+	}
+
+	private List<Post> documentsToPosts(ArrayList<Document> documents) {
+		List<Post> posts = new ArrayList<>();
+		for (Document doc : documents) {
+			String title = doc.getString("title");
+			String content = doc.getString("content");
+			Post post = new Post(title, content);
+			posts.add(post);
+		}
+		return posts;
+	}
+
+	public static ArrayList<Board> loadBoards() {
+		ArrayList<Board> boards = new ArrayList<>();
+		try (var mongoClient = MongoClients.create("mongodb+srv://cdv1:TrSLjmjeLmgkYPBm@cluster0.gqjf9pj.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")) {
+			MongoDatabase database = mongoClient.getDatabase("database");
+			MongoCollection<Document> collection = database.getCollection("boards");
+
+			for (Document doc : collection.find()) {
+				String name = doc.getString("name");
+				String college = doc.getString("college");
+				ArrayList<Post> publicPosts = new ArrayList<>();
+				ArrayList<Post> localPosts = new ArrayList<>();
+
+				List<Document> publicPostsDocs = (List<Document>) doc.get("publicPosts");
+				if (publicPostsDocs != null) {
+					for (Document postDoc : publicPostsDocs) {
+						String title = postDoc.getString("title");
+						String content = postDoc.getString("content");
+						publicPosts.add(new Post(title, content));
+					}
+				}
+
+				List<Document> localPostsDocs = (List<Document>) doc.get("localPosts");
+				if (localPostsDocs != null) {
+					for (Document postDoc : localPostsDocs) {
+						String title = postDoc.getString("title");
+						String content = postDoc.getString("content");
+						localPosts.add(new Post(title, content));
+					}
+				}
+
+
+				Board board = new Board(name, college);
+				board.setPublicPosts(publicPosts);
+				board.setLocalPosts(localPosts);
+				boards.add(board);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return boards;
+	}
+
 	/**
 	 * args[0] ; port that Alice will connect to
 	 * args[1] ; program configuration
@@ -438,8 +591,12 @@ public class Server {
 		MongoDatabase database = mongoClient.getDatabase(DB_NAME);
 		MongoCollection<Document> collection = database.getCollection(COLLECTION_NAME);
 
-		ArrayList<Board> boardArr = new ArrayList<>();
+//		Board boardPO = createBoard("frary", "PO");
+//		Board boardHMC = createBoard("hoch", "HMC");
+//		saveBoard(boardPO);
+//		saveBoard(boardHMC);
 
+		ArrayList<Board> boardArr = loadBoards();
 		// create Bob
 		try {
 			Server bob = new Server(args[0], collection, boardArr);
@@ -448,32 +605,6 @@ public class Server {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-	}
-
-	private void readBoardFile(String filename) throws IOException, ClassNotFoundException {
-		System.out.println("Reading Board file...");
-		FileInputStream fileInputStream = new FileInputStream(filename);
-		ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
-		//
-		@SuppressWarnings("unchecked")
-		ArrayList<Board> blist = (ArrayList<Board>) objectInputStream.readObject();
-		this.boardArr = blist;
-		objectInputStream.close();
-		fileInputStream.close();
-		System.out.println("Board file read successfully...");
-	}
-
-	private void saveBoards(String filename) throws IOException {
-		System.out.println("Saving Board file...");
-		FileOutputStream fileOutputStream = new FileOutputStream(filename);
-		ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
-		System.out.println(this.boardArr.get(0));
-		objectOutputStream.writeObject(this.boardArr);
-		objectOutputStream.flush();
-		objectOutputStream.close();
-		fileOutputStream.close();
-		System.out.println("Board file saved successfully...");
-
 	}
 
 	private String packageMessage(String message) throws Exception {
