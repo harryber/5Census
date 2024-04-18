@@ -235,7 +235,7 @@ public class Server {
 						String salt = BCrypt.gensalt();
 						String hashedPassword = BCrypt.hashpw(password, salt);
 
-						Document user = new Document("username", username).append("password", hashedPassword)
+							Document user = new Document("username", username).append("password", hashedPassword)
 								.append("salt", salt).append("schoolAffiliation", schoolAffiliation);
 						collection.insertOne(user);
 						System.out.println("New account created");
@@ -335,6 +335,9 @@ public class Server {
 		// Construct the string of boards to send
 		String messageToSend = "Select a board:\n";
 		for (int i = 0; i < boardArr.size(); i++) {
+
+			// CHECK IF AUTHORIZED TO VIEW BOARD
+
 			messageToSend += i + ": " + boardArr.get(i).getName() + "\n";
 		}
 		System.out.println("found all board names");
