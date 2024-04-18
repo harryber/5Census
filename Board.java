@@ -45,7 +45,19 @@ public class Board implements Serializable {
 
         return str;
     }
+    public ArrayList<Post> getLocalPosts() {
+        return local_posts;
+    }
+    public ArrayList<Post> getPublicPosts() {
+        return public_posts;
+    }
 
+    public void setLocalPosts(ArrayList<Post> localPosts) {
+        this.local_posts = local_posts;
+    }
+    public void setPublicPosts(ArrayList<Post> publicPosts) {
+        this.public_posts = public_posts;
+    }
     public String getName() {
         return name;
     }
