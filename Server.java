@@ -278,8 +278,9 @@ public class Server {
 					String boardContents = selectedBoard.viewPublicPosts();
 					ArrayList<Post> posts = getPublicPosts(selectedBoard.getName());
 //					streamOut.writeUTF(packageMessage(boardContents));
-					streamOut.writeUTF(packageMessage(posts.toString()));
 
+					streamOut.writeUTF(packageMessage(posts.toString()));
+					streamOut.flush();
 					break;
 				default:
 					break;
@@ -337,19 +338,24 @@ public class Server {
 		streamOut.writeUTF(packagedMsg);
 		streamOut.flush();
 
+
 		Board postBoard = new Board("<NULL BOARD>", "<NULL COLLEGE>");
 //		Board postBoard = new Board("<NULL BOARD>");
 
 		// User inputs a board to select
 		String selection = decryptMessage(streamIn.readUTF());
-		System.out.println("recieved a board selection...");
+		System.out.println("received a board selection...");
 		// Confirm that the selected board actually exists
-
 		for (Board b : boardArr) {
 			if (b.getName().equals(selection)) {
 				postBoard = b;
 			}
 		}
+
+		// Send that board's school affiliation to check if this is legal to view
+		String boardAffiliation = packageMessage(postBoard.getCollege());
+		streamOut.writeUTF(boardAffiliation);
+		streamOut.flush();
 
 		return postBoard;
 	}

@@ -36,7 +36,7 @@ public class Census {
     public void switchBoard(String boardName){
         Board newSelected = boards.get(boardName);
         if(newSelected!= null){
-            if(newSelected.getCollege().equals(currentUser.getCollege())){
+            if(newSelected.getCollege().equals(currentUser.getSchoolAffiliation())){
                 currentBoard = newSelected;
             }
             else{

@@ -31,6 +31,7 @@ public class Client {
 	private PublicKey bobMacKey;
 	private SecretKey secretKey;
 	private Scanner console;
+	private User localUser;
 
 	public Base64.Encoder encoder = Base64.getEncoder();
 	public Base64.Decoder decoder = Base64.getDecoder();
@@ -88,6 +89,9 @@ public class Client {
 					// Password requirements: length between 8 and 32, include a symbol or number, one capital
 					Pattern passwordPattern = Pattern.compile("^(?=.*[0-9!@#$%^&*()])(?=.*[A-Z]).{8,32}$");
 
+					String username = "";
+					String password = "";
+
 					if (credentials.equals("1")) {
 						boolean validCredentials = false;
 						while (!validCredentials) {
@@ -102,8 +106,8 @@ public class Client {
 								continue;
 							}
 
-							String username = parts[0];
-							String password = parts[1];
+							username = parts[0];
+							password = parts[1];
 
 							Matcher usernameMatcher = usernamePattern.matcher(username);
 							Matcher passwordMatcher = passwordPattern.matcher(password);
@@ -114,8 +118,6 @@ public class Client {
 								validCredentials = true;
 							}
 						}
-
-
 
 						streamOut.writeUTF(packageMessage(credentials));
 						streamOut.flush();
@@ -139,7 +141,10 @@ public class Client {
 
 						streamOut.writeUTF(packageMessage(schoolAffiliation));
 						streamOut.flush();
+
+						localUser = new User(username, schoolAffiliation);
 					}
+					//TODO: Local user is only set if creating an account.
 
 					String authStatus = decryptMessage(streamIn.readUTF());
 					if (authStatus.equals("success")) {
@@ -154,7 +159,7 @@ public class Client {
 				}
 
 				try {
-					System.out.print("\nWhat would you like to do? \n logout \n exit \n view board \n post message\n\n");
+					System.out.print("\nWhat would you like to do? \n post message \n view board \n logout \n exit \n\n");
 					line = console.nextLine();
 
 					switch (line) {
@@ -166,20 +171,26 @@ public class Client {
 							break;
 						case "view board":
 							// select a board to look at
-							boardSelectClient(streamIn, streamOut);
+							boolean canView = boardSelectClient(streamIn, streamOut);
+							if (!canView) break;
 
 							// ask server to display a board
 							packagedMsg = packageMessage("<display board>");
 							streamOut.writeUTF(packagedMsg);
 							streamOut.flush();
-	
+
+
 							// print the server's response
 							String incomingMsg = decryptMessage(streamIn.readUTF());
 							System.out.println(incomingMsg);
+
+
+
 							break;
 						case "post message":
-							System.out.println("debug: posting message...");
-							boardSelectClient(streamIn, streamOut);						
+							boolean canPost = boardSelectClient(streamIn, streamOut);
+
+							if (!canPost) break;
 
 							messageToSend = "<post to board>";
 							streamOut.writeUTF(packageMessage(messageToSend));
@@ -218,7 +229,7 @@ public class Client {
 		}
 	}
 
-	private String boardSelectClient(DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
+	private boolean boardSelectClient(DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
 		try {
 			// send a request to see the board options
 			streamOut.writeUTF(packageMessage("<boards request>"));
@@ -228,11 +239,21 @@ public class Client {
 			// pick a board
 			String selection = console.nextLine();
 			streamOut.writeUTF(packageMessage(selection));
-			return selection;
+			streamOut.flush();
+
+			String boardAffiliation = decryptMessage(streamIn.readUTF());
+			boardAffiliation = boardAffiliation.toLowerCase();
+
+			if (boardAffiliation.equals(localUser.getSchoolAffiliation())) {
+				return true;
+			}
+
+			System.out.println("This board belongs to: " + boardAffiliation + ", and you belong to: " + localUser.getSchoolAffiliation());
+			return false;
 		}
 		catch (IOException ioe) {
 			System.out.println("Could not get boards to select: " + ioe.getMessage());
-			return "";
+			return false;
 		}
 
 	}
