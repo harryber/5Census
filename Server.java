@@ -339,7 +339,9 @@ public class Server {
 		streamOut.flush();
 
 
-		Board postBoard = new Board("<NULL BOARD>", "<NULL COLLEGE>");
+		ArrayList<String> tempCollege = new ArrayList<String>();
+		tempCollege.add("<NULL COLLEGE>");
+		Board postBoard = new Board("<NULL BOARD>",tempCollege );
 //		Board postBoard = new Board("<NULL BOARD>");
 
 		// User inputs a board to select
@@ -353,7 +355,7 @@ public class Server {
 		}
 
 		// Send that board's school affiliation to check if this is legal to view
-		String boardAffiliation = packageMessage(postBoard.getCollege());
+		String boardAffiliation = packageMessage(postBoard.getCollege().toString());
 		streamOut.writeUTF(boardAffiliation);
 		streamOut.flush();
 
@@ -422,7 +424,7 @@ public class Server {
 		return true;
 	}
 
-	public static Board createBoard(String boardName, String boardCollege) {
+	public static Board createBoard(String boardName, ArrayList<String> boardCollege) {
 		return new Board(boardName, boardCollege);
 	}
 
@@ -550,9 +552,16 @@ public class Server {
 
 			for (Document doc : collection.find()) {
 				String name = doc.getString("name");
-				String college = doc.getString("college");
+				ArrayList<String> college = new ArrayList<>();
 				ArrayList<Post> publicPosts = new ArrayList<>();
 				ArrayList<Post> localPosts = new ArrayList<>();
+
+				List<Document> collegeDocs = (List<Document>) doc.get("college");
+				if (collegeDocs != null) {
+					for (Document school : collegeDocs) {
+						college.add(school.toString());
+					}
+				}
 
 				List<Document> publicPostsDocs = (List<Document>) doc.get("publicPosts");
 				if (publicPostsDocs != null) {
