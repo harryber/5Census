@@ -193,11 +193,20 @@ public class Server {
 					Document user = collection.find(query).first();
 					if (user != null) {
 						String hashedPassword = user.getString("password");
+
+
 						// Check if the entered password matches the stored hashed password
 						if (BCrypt.checkpw(password, hashedPassword)) {
 							System.out.println("User logged in successfully");
 							streamOut.writeUTF(packageMessage("success"));
 							streamOut.flush();
+
+							// Send the user their school affiliation
+							String schoolAffiliation = user.getString("schoolAffiliation");
+							streamOut.writeUTF(packageMessage(schoolAffiliation));
+							streamOut.flush();
+							System.out.println("affiliation sent");
+
 							break;
 						}
 					}

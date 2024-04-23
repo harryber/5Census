@@ -91,6 +91,7 @@ public class Client {
 
 					String username = "";
 					String password = "";
+					String localSchoolAffiliation = "<NULL>";
 
 					if (credentials.equals("1")) {
 						boolean validCredentials = false;
@@ -101,10 +102,12 @@ public class Client {
 							credentials = console.nextLine();
 
 							String[] parts = credentials.split("\\s+");
+
 							if (parts.length != 2) {
 								System.out.println("Invalid input format. Please enter username and password separated by space.");
 								continue;
 							}
+
 
 							username = parts[0];
 							password = parts[1];
@@ -118,7 +121,9 @@ public class Client {
 								validCredentials = true;
 							}
 						}
-
+						String[] parts = credentials.split("\\s+");
+						username = parts[0];
+						password = parts[1];
 						streamOut.writeUTF(packageMessage(credentials));
 						streamOut.flush();
 
@@ -150,6 +155,10 @@ public class Client {
 					if (authStatus.equals("success")) {
 						logged_in = true;
 						System.out.println("Logged in");
+						if (localUser == null) {
+							localSchoolAffiliation = decryptMessage(streamIn.readUTF());
+							localUser = new User(username, localSchoolAffiliation);
+						}
 					} else {
 						System.out.println("Failed to create account or log in (username may be taken). Please try again.");
                     }
