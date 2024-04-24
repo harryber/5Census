@@ -18,10 +18,13 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
+
+import javax.mail.*;
+import javax.mail.internet.*;
+import javax.activation.*;
+import javax.mail.Session;
+import javax.mail.Transport;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -625,6 +628,45 @@ public class Server {
 		}
 	}
 
+	private int resetPassword(String userMail){
+		Random random = new Random();
+		int code = random.nextInt(800001) + 100000;
+		String message ="Please reset password with this one time code: "+ code;
+
+		sendEmail(userMail, "Password Reset", message);
+		return code;
+	}
+	private void sendEmail(String userMail, String subject, String sendMessage){
+		Properties prop = new Properties();
+		prop.put("mail.smtp.auth", true);
+		prop.put("mail.smtp.starttls.enable", "true");
+		prop.put("mail.smtp.host", "smtp.mailtrap.io");
+		prop.put("mail.smtp.port", "25");
+		prop.put("mail.smtp.ssl.trust", "smtp.mailtrap.io");
+
+		Session session = Session.getInstance(prop, new Authenticator() {
+			@Override
+			protected PasswordAuthentication getPasswordAuthentication() {
+				return new PasswordAuthentication(username, password);
+			}
+		});
+
+		Message message = new MimeMessage(session);
+		message.setFrom(new InternetAddress("from@gmail.com"));
+		message.setRecipients(
+				Message.RecipientType.TO, InternetAddress.parse("to@gmail.com"));
+		message.setSubject(subject);
+
+		MimeBodyPart mimeBodyPart = new MimeBodyPart();
+		mimeBodyPart.setContent(sendMessage, "text/html; charset=utf-8");
+
+		Multipart multipart = new MimeMultipart();
+		multipart.addBodyPart(mimeBodyPart);
+
+		message.setContent(multipart);
+
+		Transport.send(message);
+	}
 	private String packageMessage(String message) throws Exception {
 		StringBuilder acc = new StringBuilder();
 
