@@ -15,7 +15,7 @@ public class Audit {
     }
 
     public Audit() {
-        openAudit(null);
+        this.writer = null;
     }
 
     public void log(String message) {

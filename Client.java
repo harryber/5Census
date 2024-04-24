@@ -5,7 +5,6 @@ import java.security.*;
 import java.util.Base64;
 import java.util.Scanner;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.regex.*;
 
@@ -13,12 +12,9 @@ import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
-import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 
 public class Client {
 
@@ -44,8 +40,9 @@ public class Client {
 
 	public Client(String serverPortStr, String auditFile)
 			throws Exception {
-		Audit audit = new Audit(auditFile);
 
+
+		audit = new Audit(auditFile);
 
 		publicKey = Gen.readPKCS8PublicKey(new File("a_public.pem"));
 		privateKey = Gen.readPKCS8PrivateKey(new File("a_private.pem"));
@@ -373,7 +370,8 @@ public class Client {
 
 			// create Alice to start communication
 			try {
-				Client alice = new Client(args[0], args[1]);
+				Client alice = (args.length > 2) ? new Client(args[0], args[2]) : new Client(args[0], null);
+
 
 
 			} catch (Exception e) {
