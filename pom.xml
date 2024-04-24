@@ -6,11 +6,12 @@
 
     <dependencies>
         <!-- https://mvnrepository.com/artifact/javax.mail/mail -->
+        <!-- https://mvnrepository.com/artifact/javax.mail/mail -->
         <dependency>
-            <groupId><![CDATA[javax.mail]]></groupId>
+            <groupId>javax.mail</groupId>
             <artifactId>mail</artifactId>
-            <version>1.5.0-b01</version><![CDATA[
-        ]]></dependency>
+            <version>1.5.0-b01</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.security</groupId>

@@ -628,7 +628,7 @@ public class Server {
 		}
 	}
 
-	private int resetPassword(String userMail){
+	private int resetPassword(String userMail) throws MessagingException {
 		Random random = new Random();
 		int code = random.nextInt(800001) + 100000;
 		String message ="Please reset password with this one time code: "+ code;
@@ -636,7 +636,7 @@ public class Server {
 		sendEmail(userMail, "Password Reset", message);
 		return code;
 	}
-	private void sendEmail(String userMail, String subject, String sendMessage){
+	private void sendEmail(String userMail, String subject, String sendMessage) throws MessagingException {
 		Properties prop = new Properties();
 		prop.put("mail.smtp.auth", true);
 		prop.put("mail.smtp.starttls.enable", "true");
@@ -644,17 +644,17 @@ public class Server {
 		prop.put("mail.smtp.port", "25");
 		prop.put("mail.smtp.ssl.trust", "smtp.mailtrap.io");
 
-		Session session = Session.getInstance(prop, new Authenticator() {
+		Session session = Session.getInstance(prop, new javax.mail.Authenticator() {
 			@Override
-			protected PasswordAuthentication getPasswordAuthentication() {
-				return new PasswordAuthentication(username, password);
+			protected javax.mail.PasswordAuthentication getPasswordAuthentication() {
+				return new javax.mail.PasswordAuthentication("censusclaremontcolleges@gmail.com", "5Census@Claremont");
 			}
 		});
 
 		Message message = new MimeMessage(session);
-		message.setFrom(new InternetAddress("from@gmail.com"));
+		message.setFrom(new InternetAddress("censusclaremontcolleges@gmail.com"));
 		message.setRecipients(
-				Message.RecipientType.TO, InternetAddress.parse("to@gmail.com"));
+				Message.RecipientType.TO, InternetAddress.parse(userMail));
 		message.setSubject(subject);
 
 		MimeBodyPart mimeBodyPart = new MimeBodyPart();
