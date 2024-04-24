@@ -35,14 +35,14 @@ public class Board implements Serializable {
 
         return str;
     }
-public boolean hasAccess(User user){
-        for (int i =0; i< college.size(); i++){
-            if(college.get(i).equals(user.getSchoolAffiliation())){
+    public boolean hasAccess(User user){
+        for (String c : college) {
+            if (c.equals(user.getSchoolAffiliation())) {
                 return true;
             }
         }
         return false;
-}
+    }
     public String viewLocalPosts() {
         String str = "Posts on " + name + "\n";
         for (int i = local_posts.size() - 1; i >= 0; i--) {

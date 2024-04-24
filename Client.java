@@ -149,6 +149,10 @@ public class Client {
 
 						localUser = new User(username, schoolAffiliation);
 					}
+					else {
+						String[] parts = credentials.split("\\s+");
+						username = parts[0];
+					}
 					//TODO: Local user is only set if creating an account.
 
 					String authStatus = decryptMessage(streamIn.readUTF());
@@ -242,6 +246,10 @@ public class Client {
 		try {
 			// send a request to see the board options
 			streamOut.writeUTF(packageMessage("<boards request>"));
+			streamOut.flush();
+
+			streamOut.writeUTF(localUser.getName());
+			streamOut.flush();
 			String boardMsgPrompt = decryptMessage(streamIn.readUTF());
 			// System.out.println("Select a board:\n" + incomingMsg + "\n");
 			System.out.println(boardMsgPrompt);
@@ -250,14 +258,14 @@ public class Client {
 			streamOut.writeUTF(packageMessage(selection));
 			streamOut.flush();
 
-			String boardAffiliation = decryptMessage(streamIn.readUTF());
-			boardAffiliation = boardAffiliation.toLowerCase();
+			String goodOrBadBoard = decryptMessage(streamIn.readUTF());
 
-			if (boardAffiliation.equals(localUser.getSchoolAffiliation())) {
+
+			if (goodOrBadBoard.equals("<good board>")) {
 				return true;
 			}
 
-			System.out.println("This board belongs to: " + boardAffiliation + ", and you belong to: " + localUser.getSchoolAffiliation());
+			System.out.println("This board belongs to: " + goodOrBadBoard + ", and you belong to: " + localUser.getSchoolAffiliation());
 			return false;
 		}
 		catch (IOException ioe) {

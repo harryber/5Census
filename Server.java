@@ -276,11 +276,14 @@ public class Server {
 
 					break;
 				case "<boards request>":
-					// System.out.println(streamIn.readUTF());
-					selectedBoard = boardSelectServer(boardArr, streamIn, streamOut);
+					// how to get the current user?
+
+					String username = streamIn.readUTF();
+					System.out.println("The username is " + username);
+					User user = createUserObjectFromName(username);
+					selectedBoard = boardSelectServer(boardArr, user, streamIn, streamOut);
 					break;
 				case "<display board>":
-					// System.out.println(streamIn.readUTF());
 					if (checkForErrorBoardSelection(selectedBoard, streamOut,
 							"Error displaying board, selected board invalid."))
 						break;
@@ -330,20 +333,25 @@ public class Server {
 	 * @return
 	 * @throws Exception
 	 */
-	private Board boardSelectServer(ArrayList<Board> boardArr, DataInputStream streamIn, DataOutputStream streamOut)
+	private Board boardSelectServer(ArrayList<Board> boardArr, User user, DataInputStream streamIn, DataOutputStream streamOut)
 			throws Exception {
 		System.out.println("Board select server...");
 		// Construct the string of boards to send
-		String messageToSend = "Select a board:\n";
-		for (int i = 0; i < boardArr.size(); i++) {
+		StringBuilder messageToSend = new StringBuilder("Select a board:\n");
+		for (Board board : boardArr) {
+			// indicate to the user whether they have access to the board or not
+			System.out.println(board.getName());
+			if (board.hasAccess(user)) {
+				messageToSend.append(board.getName()).append("\n");
+			}
+			else {
+				messageToSend.append(board.getName()).append(" (locked)\n");
+			}
 
-			// CHECK IF AUTHORIZED TO VIEW BOARD
-
-			messageToSend += i + ": " + boardArr.get(i).getName() + "\n";
 		}
-		System.out.println("found all board names");
+
 		// Send the boards to the client
-		String packagedMsg = packageMessage(messageToSend);
+		String packagedMsg = packageMessage(messageToSend.toString());
 		streamOut.writeUTF(packagedMsg);
 		streamOut.flush();
 
@@ -363,12 +371,28 @@ public class Server {
 			}
 		}
 
-		// Send that board's school affiliation to check if this is legal to view
+		// if the user has access, return true and let the user know
+		if (postBoard.hasAccess(user)) {
+			streamOut.writeUTF(packageMessage("<good board>"));
+			streamOut.flush();
+			return postBoard;
+		}
+
+		// if the user does not have access, tell the user which school the board belongs to
 		String boardAffiliation = packageMessage(postBoard.getCollege().toString());
 		streamOut.writeUTF(boardAffiliation);
 		streamOut.flush();
+		return null;
+//		else {
+//			messageToSend.append(board.getName()).append(" (locked)\n");
+//		}
+//
+//		// Send that board's school affiliation to check if this is legal to view
+//		String boardAffiliation = packageMessage(postBoard.getCollege().toString());
+//		streamOut.writeUTF(boardAffiliation);
+//		streamOut.flush();
 
-		return postBoard;
+
 	}
 
 	public boolean verifyMessage(String message)
@@ -561,14 +585,14 @@ public class Server {
 
 			for (Document doc : collection.find()) {
 				String name = doc.getString("name");
-				ArrayList<String> college = new ArrayList<>();
+				ArrayList<String> schoolAffiliations = new ArrayList<>();
 				ArrayList<Post> publicPosts = new ArrayList<>();
 				ArrayList<Post> localPosts = new ArrayList<>();
 
-				List<Document> collegeDocs = (List<Document>) doc.get("college");
+				List<String> collegeDocs = (List<String>)doc.get("college");
 				if (collegeDocs != null) {
-					for (Document school : collegeDocs) {
-						college.add(school.toString());
+					for (String school : collegeDocs) {
+						schoolAffiliations.add(school.toString());
 					}
 				}
 
@@ -591,7 +615,8 @@ public class Server {
 				}
 
 
-				Board board = new Board(name, college);
+				Board board = new Board(name, schoolAffiliations);
+//				System.out.println("BOARD: " + board.getName() + ", schools: " + schoolAffiliations.getFirst());
 				board.setPublicPosts(publicPosts);
 				board.setLocalPosts(localPosts);
 				boards.add(board);
@@ -600,6 +625,23 @@ public class Server {
 			e.printStackTrace();
 		}
 		return boards;
+	}
+
+    private User createUserObjectFromName(String username) {
+		User user = null;
+
+		Document query = new Document("username", username);
+		Document userInfo = collection.find(query).first();
+
+		if (userInfo != null) {
+			String schoolAffiliation = userInfo.getString("schoolAffiliation");
+			// any other info that users need in future will go here...
+
+
+			user = new User(username, schoolAffiliation);
+		}
+
+		return user;
 	}
 
 	/**
@@ -618,12 +660,26 @@ public class Server {
 		MongoDatabase database = mongoClient.getDatabase(DB_NAME);
 		MongoCollection<Document> collection = database.getCollection(COLLECTION_NAME);
 
-//		Board boardPO = createBoard("frary", "PO");
-//		Board boardHMC = createBoard("hoch", "HMC");
-//		saveBoard(boardPO);
-//		saveBoard(boardHMC);
+//		ArrayList<String> honSchools = new ArrayList<>();
+//		honSchools.add("po");
+//		honSchools.add("cmc");
+//		honSchools.add("pz");
+//		honSchools.add("hmc");
+//		honSchools.add("sc");
+//
+//		ArrayList<String> moundSchools = new ArrayList<>();
+//		moundSchools.add("pz");
+//		Board honnoldBoard = createBoard("honnold library", honSchools);
+//		Board moundsBoard = createBoard("mounds", moundSchools);
+//		saveBoard(honnoldBoard);
+//		saveBoard(moundsBoard);
 
 		ArrayList<Board> boardArr = loadBoards();
+
+//		for (Board board : boardArr) {
+//			System.out.println(board.getName());
+//		}
+
 		// create Bob
 		try {
 			Server bob = new Server(args[0], collection, boardArr);
