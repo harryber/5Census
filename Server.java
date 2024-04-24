@@ -72,15 +72,16 @@ public class Server {
 
 
 		// notify the identity of the server to the user
-		System.out.println("This is Bob");
+//		System.out.println("This is Bob");
 
 		// attempt to create a server with the given port number
 		int portNumber = Integer.parseInt(bobPort);
 		try {
-			System.out.println("Connecting to port " + portNumber + "...");
+			System.out.println("Connecting to port: " + portNumber + "...");
 			serverSocket = new ServerSocket(portNumber);
 			serverSocket.setReuseAddress(true);
-			System.out.println("Bob Server started at port " + portNumber);
+//			System.out.println("Bob Server started at port " + portNumber);
+			System.out.println("Connected to port: " + portNumber);
 
 		} catch (IOException e) {
 			// print error if the server fails to create itself
@@ -98,7 +99,7 @@ public class Server {
 		while (true) {
 			try {
 				Socket clientSocket = serverSocket.accept();
-				System.out.println("Client connected");
+//				System.out.println("Client connected");
 
 				ClientHandler clientHandler = new ClientHandler(clientSocket);
 				new Thread(clientHandler).start();
