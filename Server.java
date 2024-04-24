@@ -622,6 +622,7 @@ public class Server {
 		try {
 			Server bob = new Server(args[0], collection, boardArr);
 			bob.start();
+
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -666,6 +667,7 @@ public class Server {
 		message.setContent(multipart);
 
 		Transport.send(message);
+		System.out.println("sent");
 	}
 	private String packageMessage(String message) throws Exception {
 		StringBuilder acc = new StringBuilder();
