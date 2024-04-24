@@ -600,7 +600,7 @@ public class Server {
 	 * args[0] ; port that Alice will connect to
 	 * args[1] ; program configuration
 	 */
-	public static void main(String[] args) {
+	public static void main(String[] args) throws MessagingException {
 		// check for correct # of parameters
 		if (args.length != 1) {
 			System.out.println("Incorrect number of parameters");
@@ -617,16 +617,17 @@ public class Server {
 //		saveBoard(boardPO);
 //		saveBoard(boardHMC);
 
+		Server.sendEmail("readitandweep21@gmail.com", "hi", "this is a test");
 		ArrayList<Board> boardArr = loadBoards();
 		// create Bob
 		try {
 			Server bob = new Server(args[0], collection, boardArr);
 			bob.start();
-
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+
 	}
 
 	private int resetPassword(String userMail) throws MessagingException {
@@ -637,38 +638,80 @@ public class Server {
 		sendEmail(userMail, "Password Reset", message);
 		return code;
 	}
-	private void sendEmail(String userMail, String subject, String sendMessage) throws MessagingException {
-		Properties prop = new Properties();
-		prop.put("mail.smtp.auth", true);
-		prop.put("mail.smtp.starttls.enable", "true");
-		prop.put("mail.smtp.host", "smtp.mailtrap.io");
-		prop.put("mail.smtp.port", "25");
-		prop.put("mail.smtp.ssl.trust", "smtp.mailtrap.io");
+	private static void sendEmail(String userMail, String subject, String sendMessage) throws MessagingException {
+		//https://www.baeldung.com/java-email
+//		Properties prop = new Properties();
+//		prop.put("mail.smtp.auth", true);
+//		prop.put("mail.smtp.starttls.enable", "true");
+//		prop.put("mail.smtp.host", "smtp.mailtrap.io");
+//		prop.put("mail.smtp.port", "25");
+//		prop.put("mail.smtp.ssl.trust", "smtp.mailtrap.io");
+//
+//		Session session = Session.getInstance(prop, new javax.mail.Authenticator() {
+//			@Override
+//			protected javax.mail.PasswordAuthentication getPasswordAuthentication() {
+//				return new javax.mail.PasswordAuthentication("censusclaremontcolleges@gmail.com", "5Census@Claremont");
+//			}
+//		});
+//
+//		Message message = new MimeMessage(session);
+//		message.setFrom(new InternetAddress("censusclaremontcolleges@gmail.com"));
+//		message.setRecipients(
+//				Message.RecipientType.TO, InternetAddress.parse(userMail));
+//		message.setSubject(subject);
+//
+//		MimeBodyPart mimeBodyPart = new MimeBodyPart();
+//		mimeBodyPart.setContent(sendMessage, "text/html; charset=utf-8");
+//
+//		Multipart multipart = new MimeMultipart();
+//		multipart.addBodyPart(mimeBodyPart);
+//
+//		message.setContent(multipart);
+//
+//		Transport.send(message);
+//		System.out.println("sent");
+		// Recipient's email ID needs to be mentioned.
+		String to = userMail;
 
-		Session session = Session.getInstance(prop, new javax.mail.Authenticator() {
-			@Override
-			protected javax.mail.PasswordAuthentication getPasswordAuthentication() {
-				return new javax.mail.PasswordAuthentication("censusclaremontcolleges@gmail.com", "5Census@Claremont");
-			}
-		});
+		// Sender's email ID needs to be mentioned
+		String from = "censusclaremontcolleges@gmail.com";
 
-		Message message = new MimeMessage(session);
-		message.setFrom(new InternetAddress("censusclaremontcolleges@gmail.com"));
-		message.setRecipients(
-				Message.RecipientType.TO, InternetAddress.parse(userMail));
-		message.setSubject(subject);
+		// Assuming you are sending email from localhost
+		String host = "localhost";
 
-		MimeBodyPart mimeBodyPart = new MimeBodyPart();
-		mimeBodyPart.setContent(sendMessage, "text/html; charset=utf-8");
+		// Get system properties
+		Properties properties = System.getProperties();
 
-		Multipart multipart = new MimeMultipart();
-		multipart.addBodyPart(mimeBodyPart);
+		// Setup mail server
+		properties.setProperty("mail.smtp.host", host);
 
-		message.setContent(multipart);
+		// Get the default Session object.
+		Session session = Session.getDefaultInstance(properties);
 
-		Transport.send(message);
-		System.out.println("sent");
+		try {
+			// Create a default MimeMessage object.
+			MimeMessage message = new MimeMessage(session);
+
+			// Set From: header field of the header.
+			message.setFrom(new InternetAddress(from));
+
+			// Set To: header field of the header.
+			message.addRecipient(Message.RecipientType.TO, new InternetAddress(to));
+
+			// Set Subject: header field
+			message.setSubject(subject);
+
+			// Send the actual HTML message, as big as you like
+			message.setContent(message, "text/html");
+
+			// Send message
+			Transport.send(message);
+			System.out.println("Sent message successfully....");
+		} catch (MessagingException mex) {
+			mex.printStackTrace();
+		}
 	}
+
 	private String packageMessage(String message) throws Exception {
 		StringBuilder acc = new StringBuilder();
 
