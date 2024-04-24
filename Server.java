@@ -640,6 +640,7 @@ public class Server {
 	}
 	private static void sendEmail(String userMail, String subject, String sendMessage) throws MessagingException {
 		//https://www.baeldung.com/java-email
+
 //		Properties prop = new Properties();
 //		prop.put("mail.smtp.auth", true);
 //		prop.put("mail.smtp.starttls.enable", "true");
@@ -671,6 +672,8 @@ public class Server {
 //		Transport.send(message);
 //		System.out.println("sent");
 		// Recipient's email ID needs to be mentioned.
+
+		//https://www.tutorialspoint.com/java/java_sending_email.htm
 		String to = userMail;
 
 		// Sender's email ID needs to be mentioned
@@ -710,6 +713,8 @@ public class Server {
 		} catch (MessagingException mex) {
 			mex.printStackTrace();
 		}
+
+		//https://www.geeksforgeeks.org/send-email-using-java-program/
 	}
 
 	private String packageMessage(String message) throws Exception {
