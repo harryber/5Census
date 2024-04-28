@@ -1,27 +1,10 @@
 
 import java.io.*;
-import java.net.*;
 import java.security.*;
 import java.util.Base64;
 import java.util.Scanner;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.regex.*;
-
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.KeyGenerator;
-import javax.crypto.Mac;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.*;
-import java.io.*;
-
 public class Client {
 
 	// instance variables
@@ -43,15 +26,10 @@ public class Client {
 		LOGOUT, VIEW, SUBMIT, DELETE, EDIT
 	}
 
-	public Client(String serverPortStr)
+	public Client(String serverPortStr, String auditFile)
 			throws Exception {
 
-		publicKey = Gen.readPKCS8PublicKey(new File("a_public.pem"));
-		privateKey = Gen.readPKCS8PrivateKey(new File("a_private.pem"));
-		bobKey = Gen.readPKCS8PublicKey(new File("b_public.pem"));
-		publicMacKey = Gen.readPKCS8PublicKey(new File("a_macpublic.pem"));
-		privateMacKey = Gen.readPKCS8PrivateKey(new File("a_macprivate.pem"));
-		bobMacKey = Gen.readPKCS8PublicKey(new File("b_macpublic.pem"));
+		audit = new Audit(auditFile);
 
 		console = new Scanner(System.in);
 		System.out.println("This is Alice");
@@ -120,6 +98,8 @@ public class Client {
 
 					String username = "";
 					String password = "";
+					String localSchoolAffiliation = "<NULL>";
+
 
 					if (credentials.equals("1")) {
 						boolean validCredentials = false;

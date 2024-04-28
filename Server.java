@@ -12,26 +12,15 @@ import java.net.*;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.security.Signature;
 import java.security.SignatureException;
-import java.security.cert.X509Certificate;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.security.KeyStore;
-
 import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.*;
 
 
@@ -145,6 +134,7 @@ public class Server {
 			this.clientSocket = socket;
 			try {
 				streamIn = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
+				System.out.println("streamIn created");
 				streamOut = new DataOutputStream(clientSocket.getOutputStream());
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -163,12 +153,15 @@ public class Server {
 						authenticateUser(streamIn, streamOut);
 						first = false;
 					}
-
-					if (streamIn.available() > 0) {
-						String incomingMsg = streamIn.readUTF();
-						processMessage(incomingMsg, streamIn, streamOut);
-						finished = incomingMsg.split(",")[0].equals("done") || finished;
-					}
+//					System.out.println(streamIn.available());
+					String incomingMsg = streamIn.readUTF();
+					processMessage(incomingMsg, streamIn, streamOut);
+					finished = incomingMsg.split(",")[0].equals("done") || finished;
+//					if (streamIn.available() > 0) {
+//						String incomingMsg = streamIn.readUTF();
+//						processMessage(incomingMsg, streamIn, streamOut);
+//						finished = incomingMsg.split(",")[0].equals("done") || finished;
+//					}
 				}
 			} catch (SocketException e) {
 				System.out.println("Client connection closed unexpectedly");
@@ -222,7 +215,7 @@ public class Server {
 
 							// Send the user their school affiliation
 							String schoolAffiliation = user.getString("schoolAffiliation");
-							streamOut.writeUTF(packageMessage(schoolAffiliation));
+							streamOut.writeUTF(schoolAffiliation);
 							streamOut.flush();
 							System.out.println("affiliation sent");
 
@@ -264,7 +257,7 @@ public class Server {
 
 		private void processMessage(String decryptedMsg, DataInputStream streamIn, DataOutputStream streamOut)
 				throws Exception {
-
+			System.out.println("Processing client message");
 			switch (decryptedMsg) {
 				case "<post to board>":
 					if (checkForErrorBoardSelection(selectedBoard, streamOut,
@@ -304,8 +297,6 @@ public class Server {
 						break;
 					String boardContents = selectedBoard.viewPublicPosts();
 					ArrayList<Post> posts = getPublicPosts(selectedBoard.getName());
-//					streamOut.writeUTF(packageMessage(boardContents));
-
 					streamOut.writeUTF(posts.toString());
 					streamOut.flush();
 					break;
@@ -366,8 +357,7 @@ public class Server {
 		}
 
 		// Send the boards to the client
-		String packagedMsg = messageToSend;
-		streamOut.writeUTF(packagedMsg);
+		streamOut.writeUTF(String.valueOf(messageToSend));
 		streamOut.flush();
 
 
@@ -387,19 +377,19 @@ public class Server {
 		}
 
         if (postBoard.hasAccess(user)) {
-            streamOut.writeUTF(packageMessage("<good board>"));
+            streamOut.writeUTF("<good board>");
             streamOut.flush();
             return postBoard;
         }
 
         // if the user does not have access, tell the user which school the board belongs to
-        String boardAffiliation = packageMessage(postBoard.getCollege().toString());
+        String boardAffiliation = postBoard.getCollege().toString();
         streamOut.writeUTF(boardAffiliation);
         streamOut.flush();
         return null;
 	}
 
-	public static Board createBoard(String boardName, String boardCollege) {
+	public static Board createBoard(String boardName, ArrayList<String> boardCollege) {
 		return new Board(boardName, boardCollege);
 	}
 
