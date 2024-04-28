@@ -67,8 +67,10 @@ public class Server {
 
 		this.collection = collection;
 
+
 		// notify the identity of the server to the user
 		System.out.println("This is Bob");
+
 		// attempt to create a server with the given port number
 		int portNumber = Integer.parseInt(bobPort);
 		try {
@@ -96,7 +98,7 @@ public class Server {
 			serverSocket.setEnabledProtocols(protocols);
 			serverSocket.setEnabledCipherSuites(cipher_suites);
 			serverSocket.setReuseAddress(true);
-
+			System.out.println("Bob Server started at port " + portNumber);
 
 		} catch (IOException e) {
 			// print error if the server fails to create itself
@@ -168,7 +170,6 @@ public class Server {
 						finished = incomingMsg.split(",")[0].equals("done") || finished;
 					}
 				}
-
 			} catch (SocketException e) {
 				System.out.println("Client connection closed unexpectedly");
 			} catch (IOException | NoSuchAlgorithmException | InvalidKeyException | SignatureException
@@ -218,6 +219,13 @@ public class Server {
 							System.out.println("User logged in successfully");
 							streamOut.writeUTF("success");
 							streamOut.flush();
+
+							// Send the user their school affiliation
+							String schoolAffiliation = user.getString("schoolAffiliation");
+							streamOut.writeUTF(packageMessage(schoolAffiliation));
+							streamOut.flush();
+							System.out.println("affiliation sent");
+
 							break;
 						}
 					}
@@ -282,8 +290,12 @@ public class Server {
 
 					break;
 				case "<boards request>":
-					// System.out.println(streamIn.readUTF());
-					selectedBoard = boardSelectServer(boardArr, streamIn, streamOut);
+					// how to get the current user?
+
+					String username = streamIn.readUTF();
+					System.out.println("The username is " + username);
+					User user = createUserObjectFromName(username);
+					selectedBoard = boardSelectServer(boardArr, user, streamIn, streamOut);
 					break;
 				case "<display board>":
 					// System.out.println(streamIn.readUTF());
@@ -329,32 +341,39 @@ public class Server {
 	 * Bridge method between server and client in order
 	 * to determine which board the client is trying to
 	 * interact with
-	 *
+	 * 
 	 * @param boardArr  Array of all boards
 	 * @param streamIn
 	 * @param streamOut
 	 * @return
 	 * @throws Exception
 	 */
-	private Board boardSelectServer(ArrayList<Board> boardArr, DataInputStream streamIn, DataOutputStream streamOut)
+	private Board boardSelectServer(ArrayList<Board> boardArr, User user, DataInputStream streamIn, DataOutputStream streamOut)
 			throws Exception {
 		System.out.println("Board select server...");
 		// Construct the string of boards to send
-		String messageToSend = "Select a board:\n";
-		for (int i = 0; i < boardArr.size(); i++) {
+		StringBuilder messageToSend = new StringBuilder("Select a board:\n");
+		for (Board board : boardArr) {
+			// indicate to the user whether they have access to the board or not
+			System.out.println(board.getName());
+			if (board.hasAccess(user)) {
+				messageToSend.append(board.getName()).append("\n");
+			}
+			else {
+				messageToSend.append(board.getName()).append(" (locked)\n");
+			}
 
-			// CHECK IF AUTHORIZED TO VIEW BOARD
-
-			messageToSend += i + ": " + boardArr.get(i).getName() + "\n";
 		}
-		System.out.println("found all board names");
+
 		// Send the boards to the client
 		String packagedMsg = messageToSend;
 		streamOut.writeUTF(packagedMsg);
 		streamOut.flush();
 
 
-		Board postBoard = new Board("<NULL BOARD>", "<NULL COLLEGE>");
+		ArrayList<String> tempCollege = new ArrayList<String>();
+		tempCollege.add("<NULL COLLEGE>");
+		Board postBoard = new Board("<NULL BOARD>",tempCollege );
 //		Board postBoard = new Board("<NULL BOARD>");
 
 		// User inputs a board to select
@@ -367,13 +386,19 @@ public class Server {
 			}
 		}
 
-		// Send that board's school affiliation to check if this is legal to view
-		String boardAffiliation = postBoard.getCollege();
-		streamOut.writeUTF(boardAffiliation);
-		streamOut.flush();
+        if (postBoard.hasAccess(user)) {
+            streamOut.writeUTF(packageMessage("<good board>"));
+            streamOut.flush();
+            return postBoard;
+        }
 
-		return postBoard;
+        // if the user does not have access, tell the user which school the board belongs to
+        String boardAffiliation = packageMessage(postBoard.getCollege().toString());
+        streamOut.writeUTF(boardAffiliation);
+        streamOut.flush();
+        return null;
 	}
+
 	public static Board createBoard(String boardName, String boardCollege) {
 		return new Board(boardName, boardCollege);
 	}
@@ -502,9 +527,16 @@ public class Server {
 
 			for (Document doc : collection.find()) {
 				String name = doc.getString("name");
-				String college = doc.getString("college");
+				ArrayList<String> schoolAffiliations = new ArrayList<>();
 				ArrayList<Post> publicPosts = new ArrayList<>();
 				ArrayList<Post> localPosts = new ArrayList<>();
+
+				List<String> collegeDocs = (List<String>)doc.get("college");
+				if (collegeDocs != null) {
+					for (String school : collegeDocs) {
+						schoolAffiliations.add(school.toString());
+					}
+				}
 
 				List<Document> publicPostsDocs = (List<Document>) doc.get("publicPosts");
 				if (publicPostsDocs != null) {
@@ -525,7 +557,8 @@ public class Server {
 				}
 
 
-				Board board = new Board(name, college);
+				Board board = new Board(name, schoolAffiliations);
+//				System.out.println("BOARD: " + board.getName() + ", schools: " + schoolAffiliations.getFirst());
 				board.setPublicPosts(publicPosts);
 				board.setLocalPosts(localPosts);
 				boards.add(board);
@@ -534,6 +567,23 @@ public class Server {
 			e.printStackTrace();
 		}
 		return boards;
+	}
+
+    private User createUserObjectFromName(String username) {
+		User user = null;
+
+		Document query = new Document("username", username);
+		Document userInfo = collection.find(query).first();
+
+		if (userInfo != null) {
+			String schoolAffiliation = userInfo.getString("schoolAffiliation");
+			// any other info that users need in future will go here...
+
+
+			user = new User(username, schoolAffiliation);
+		}
+
+		return user;
 	}
 
 	/**

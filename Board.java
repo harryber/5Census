@@ -3,11 +3,11 @@ import java.util.ArrayList;
 
 public class Board implements Serializable {
     private String name;
-    private String college;
+    private ArrayList<String> college;
     private ArrayList<Post> public_posts;
     private ArrayList<Post> local_posts;
 
-    public Board(String board_name, String board_college) {
+    public Board(String board_name, ArrayList<String> board_college) {
         name = board_name;
         college = board_college;
         public_posts = new ArrayList<Post>();
@@ -35,7 +35,14 @@ public class Board implements Serializable {
 
         return str;
     }
-
+    public boolean hasAccess(User user){
+        for (String c : college) {
+            if (c.equals(user.getSchoolAffiliation())) {
+                return true;
+            }
+        }
+        return false;
+    }
     public String viewLocalPosts() {
         String str = "Posts on " + name + "\n";
         for (int i = local_posts.size() - 1; i >= 0; i--) {
@@ -62,7 +69,7 @@ public class Board implements Serializable {
         return name;
     }
 
-    public String getCollege() {
+    public ArrayList<String> getCollege() {
         return college;
     }
 

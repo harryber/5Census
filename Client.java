@@ -37,12 +37,21 @@ public class Client {
 	public Base64.Encoder encoder = Base64.getEncoder();
 	public Base64.Decoder decoder = Base64.getDecoder();
 
+	private Audit audit;
+
 	public enum UserAction {
 		LOGOUT, VIEW, SUBMIT, DELETE, EDIT
 	}
 
 	public Client(String serverPortStr)
 			throws Exception {
+
+		publicKey = Gen.readPKCS8PublicKey(new File("a_public.pem"));
+		privateKey = Gen.readPKCS8PrivateKey(new File("a_private.pem"));
+		bobKey = Gen.readPKCS8PublicKey(new File("b_public.pem"));
+		publicMacKey = Gen.readPKCS8PublicKey(new File("a_macpublic.pem"));
+		privateMacKey = Gen.readPKCS8PrivateKey(new File("a_macprivate.pem"));
+		bobMacKey = Gen.readPKCS8PublicKey(new File("b_macpublic.pem"));
 
 		console = new Scanner(System.in);
 		System.out.println("This is Alice");
@@ -122,7 +131,9 @@ public class Client {
 
 							String[] parts = credentials.split("\\s+");
 							if (parts.length != 2) {
-								System.out.println("Invalid input format. Please enter username and password separated by space.");
+//								System.out.println("Invalid input format. Please enter username and password separated by space.");
+								audit.logPrint("Invalid input format. Please enter username and password separated by space.");
+								audit.logPrint(credentials);
 								continue;
 							}
 
@@ -133,12 +144,16 @@ public class Client {
 							Matcher passwordMatcher = passwordPattern.matcher(password);
 
 							if (!usernameMatcher.matches() || !passwordMatcher.matches()) {
-								System.out.println("Failed to meet username or password requirements."); // this is bad. tells you if you didnt enter a properly formatted password
+//								System.out.println("Failed to meet username or password requirements."); // this is bad. tells you if you didnt enter a properly formatted password
+								audit.logPrint("Failed to meet username or password requirements."); // this is bad. tells you if you didnt enter a properly formatted password
+								audit.logPrint("Username: " + username);
 							} else {
 								validCredentials = true;
 							}
 						}
-
+						String[] parts = credentials.split("\\s+");
+						username = parts[0];
+						password = parts[1];
 						streamOut.writeUTF(credentials);
 						streamOut.flush();
 
@@ -146,16 +161,20 @@ public class Client {
 						boolean validCollege = false;
 						String schoolAffiliation = "";
 						while (!validCollege) {
-							System.out.println("Which college do you belong to? [PO, HMC, CMC, PZ, SC]");
+							audit.logPrint("User is selecting a college");
+//							System.out.println("Which college do you belong to? [PO, HMC, CMC, PZ, SC]");
+							audit.logPrint("Which college do you belong to? [PO, HMC, CMC, PZ, SC]");
 							schoolAffiliation = console.nextLine();
 							schoolAffiliation = schoolAffiliation.toLowerCase();
 							if (schoolAffiliation.equals("po") || schoolAffiliation.equals("hmc") || schoolAffiliation.equals("cmc") ||
 									schoolAffiliation.equals("pz") || schoolAffiliation.equals("sc")) {
 
 								validCollege = true;
+								audit.logPrint("User has selected a valid college:" + schoolAffiliation);
 							}
 							else {
-								System.out.println("Invalid school selection");
+//								System.out.println("Invalid school selection");
+								audit.logPrint("Invalid school selection");
 							}
 						}
 
@@ -164,14 +183,25 @@ public class Client {
 
 						localUser = new User(username, schoolAffiliation);
 					}
+					else {
+						String[] parts = credentials.split("\\s+");
+						username = parts[0];
+					}
 					//TODO: Local user is only set if creating an account.
 
 					String authStatus = streamIn.readUTF();
 					if (authStatus.equals("success")) {
 						logged_in = true;
-						System.out.println("Logged in");
+
+						if (localUser == null) {
+							localSchoolAffiliation = (streamIn.readUTF());
+							localUser = new User(username, localSchoolAffiliation);
+						}
+//						System.out.println("Logged in");
+						audit.logPrint("User has logged in");
 					} else {
-						System.out.println("Failed to create account or log in (username may be taken). Please try again.");
+//						System.out.println("Failed to create account or log in (username may be taken). Please try again.");
+						audit.logPrint("Failed to create account or log in (username may be taken). Please try again.");
                     }
 
 
@@ -184,7 +214,8 @@ public class Client {
 
 					switch (line) {
 						case "logout":
-							System.out.println("HAH you thought you could escape?");
+//							System.out.println("HAH you thought you could escape?");
+							audit.logPrint("User has logged out");
 							break;
 						case "exit":
 							keepLooping = false;
@@ -202,7 +233,7 @@ public class Client {
 
 							// print the server's response
 							String incomingMsg = streamIn.readUTF();
-							System.out.println(incomingMsg);
+                            audit.logPrint(incomingMsg);
 
 
 
@@ -218,7 +249,8 @@ public class Client {
 
 							// if (decryptMessage(streamIn.readUTF()).equals("<board select failed>"))
 
-							System.out.println("What message would you like to post?\n");
+//							System.out.println("What message would you like to post?\n");
+							audit.logPrint("What message would you like to post?\n");
 							messageToSend = console.nextLine();
 							packagedMsg = messageToSend;
 							streamOut.writeUTF(packagedMsg);
@@ -226,14 +258,16 @@ public class Client {
 							// System.out.println("Message sent");
 							break;
 						default:
-							System.out.println("Invalid action");
+//							System.out.println("Invalid action");
+							audit.log("Invalid action");
 							break;
 					}
 
 					
 
 				} catch (IOException ioe) {
-					System.out.println("Sending error: " + ioe.getMessage());
+//					System.out.println("Sending error: " + ioe.getMessage());
+					audit.logPrint("Sending error: " + ioe.getMessage());
 				}
 			}
 
@@ -244,16 +278,23 @@ public class Client {
 
 		} catch (IOException e) {
 			// print error
-			System.out.println("Connection failed due to following reason");
-			System.out.println(e);
+//			System.out.println("Connection failed due to following reason");
+			audit.logPrint("Connection failed due to following reason");
+			audit.logPrint(e.getMessage());
+//			System.out.println(e);
+
 		}
 	}
 
 	private boolean boardSelectClient(DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
 		try {
 			// send a request to see the board options
-			streamOut.writeUTF("<boards request>");
-			String boardMsgPrompt = streamIn.readUTF();
+			streamOut.writeUTF(("<boards request>"));
+			streamOut.flush();
+
+			streamOut.writeUTF(localUser.getName());
+			streamOut.flush();
+			String boardMsgPrompt = (streamIn.readUTF());
 			// System.out.println("Select a board:\n" + incomingMsg + "\n");
 			System.out.println(boardMsgPrompt);
 			// pick a board
@@ -261,18 +302,22 @@ public class Client {
 			streamOut.writeUTF(selection);
 			streamOut.flush();
 
-			String boardAffiliation = streamIn.readUTF();
-			boardAffiliation = boardAffiliation.toLowerCase();
+			String goodOrBadBoard = (streamIn.readUTF());
 
-			if (boardAffiliation.equals(localUser.getSchoolAffiliation())) {
+
+			if (goodOrBadBoard.equals("<good board>")) {
 				return true;
 			}
 
-			System.out.println("This board belongs to: " + boardAffiliation + ", and you belong to: " + localUser.getSchoolAffiliation());
+			System.out.println("This board belongs to: " + goodOrBadBoard + ", and you belong to: " + localUser.getSchoolAffiliation());
+//			System.out.println("This board belongs to: " + boardAffiliation + ", and you belong to: " + localUser.getSchoolAffiliation());
+			audit.logPrint("This board belongs to: " + goodOrBadBoard + ", and you belong to: " + localUser.getSchoolAffiliation());
 			return false;
+
 		}
 		catch (IOException ioe) {
-			System.out.println("Could not get boards to select: " + ioe.getMessage());
+//			System.out.println("Could not get boards to select: " + ioe.getMessage());
+			audit.logPrint("Could not get boards to select: " + ioe.getMessage());
 			return false;
 		}
 
@@ -285,12 +330,15 @@ public class Client {
 	public static void main(String[] args) {
 
 		// check for correct # of parameters
-		if (args.length != 1) {
+		if (args.length < 1) {
 			System.out.println("Incorrect number of parameters");
 		} else {
 			// create Alice to start communication
 			try {
-				Client alice = new Client(args[0]);
+				Client alice = (args.length > 2) ? new Client(args[0], args[2]) : new Client(args[0], null);
+
+
+
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
