@@ -9,3 +9,16 @@ target/classes/Server$ClientHandler.class
 target/classes/Server.class
 /target/
 /.idea/
+/ca-cert.pem
+/ca-cert.srl
+/ca-key.pem
+/client-cert.pem
+/client-key.pem
+/client-csr.pem
+/client-truststore.jks
+/server-keystore.jks
+/server_csr.pem
+/server_certificate.pem
+/server_key.pem
+/server-truststore.jks
+/server_certificate.crt

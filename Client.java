@@ -19,19 +19,20 @@ import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.net.ssl.*;
+import java.io.*;
 
 public class Client {
 
 	// instance variables
-	private PublicKey publicKey;
-	private PrivateKey privateKey;
-	private PublicKey publicMacKey;
-	private PrivateKey privateMacKey;
-	private PublicKey bobKey;
-	private PublicKey bobMacKey;
-	private SecretKey secretKey;
 	private Scanner console;
 	private User localUser;
+
+	private static final String[] protocols = new String[]{"TLSv1.3"};
+
+	private static final String[] cipher_suites = new String[]{"TLS_AES_256_GCM_SHA384"};
+	private static final String TRUSTSTORE_PATH = "client-truststore.jks";
+	private static final String TRUSTSTORE_PASS = "keystore1!";
 
 	public Base64.Encoder encoder = Base64.getEncoder();
 	public Base64.Decoder decoder = Base64.getDecoder();
@@ -43,13 +44,6 @@ public class Client {
 	public Client(String serverPortStr)
 			throws Exception {
 
-		publicKey = Gen.readPKCS8PublicKey(new File("a_public.pem"));
-		privateKey = Gen.readPKCS8PrivateKey(new File("a_private.pem"));
-		bobKey = Gen.readPKCS8PublicKey(new File("b_public.pem"));
-		publicMacKey = Gen.readPKCS8PublicKey(new File("a_macpublic.pem"));
-		privateMacKey = Gen.readPKCS8PrivateKey(new File("a_macprivate.pem"));
-		bobMacKey = Gen.readPKCS8PublicKey(new File("b_macpublic.pem"));
-
 		console = new Scanner(System.in);
 		System.out.println("This is Alice");
 
@@ -57,16 +51,42 @@ public class Client {
 		int serverPort = Integer.parseInt(serverPortStr);
 		String serverAddress = "localhost";
 
-		try {
-			System.out.println("Connecting to Server at (" + serverPort + ", " + serverAddress + ")...");
-			Socket serverSocket = new Socket(serverAddress, serverPort);
-			System.out.println("Connected to Server");
+		SSLSocket socket = null;
 
-			DataOutputStream streamOut = new DataOutputStream(serverSocket.getOutputStream());
-			DataInputStream streamIn = new DataInputStream(new BufferedInputStream(serverSocket.getInputStream()));
-			streamOut.writeUTF(keyAgreement());
-			streamOut.flush();
-			// todo: authenticate server to user
+
+		try {
+
+			KeyStore trustStore = KeyStore.getInstance("JKS");
+			FileInputStream fis = new FileInputStream(TRUSTSTORE_PATH);
+			trustStore.load(fis, TRUSTSTORE_PASS.toCharArray());
+
+			System.out.println("Connecting to Server at (" + serverPort + ", " + serverAddress + ")...");
+
+
+
+			TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+			tmf.init(trustStore);
+
+
+			SSLContext sslContext = SSLContext.getInstance("TLSv1.3");
+			sslContext.init(null, tmf.getTrustManagers(), null);
+
+			SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+			socket = (SSLSocket) factory.createSocket("localhost", 1010);
+
+			socket.setEnabledProtocols(protocols);
+			socket.setEnabledCipherSuites(cipher_suites);
+			socket.startHandshake();
+			System.out.println("Handshake complete");
+
+			OutputStreamWriter writer = new OutputStreamWriter(socket.getOutputStream());
+			writer.write("Hello, Server!\n");
+			writer.flush();
+
+			DataOutputStream streamOut = new DataOutputStream(socket.getOutputStream());
+			DataInputStream streamIn = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
+
+
 			// obtain the message from the user and send it to Server
 			// the communication ends when the user inputs "done"
 			String line = "";
@@ -76,11 +96,11 @@ public class Client {
 			boolean logged_in = false;
 			while (keepLooping) {
 				while (!logged_in) {
-					String serverResponse = decryptMessage(streamIn.readUTF());
+					String serverResponse = streamIn.readUTF();
 					System.out.println(serverResponse);
 					String credentials = console.nextLine();
 
-					streamOut.writeUTF(packageMessage(credentials));
+					streamOut.writeUTF(credentials);
 					streamOut.flush();
 
 
@@ -119,7 +139,7 @@ public class Client {
 							}
 						}
 
-						streamOut.writeUTF(packageMessage(credentials));
+						streamOut.writeUTF(credentials);
 						streamOut.flush();
 
 						// Select a college
@@ -139,14 +159,14 @@ public class Client {
 							}
 						}
 
-						streamOut.writeUTF(packageMessage(schoolAffiliation));
+						streamOut.writeUTF(schoolAffiliation);
 						streamOut.flush();
 
 						localUser = new User(username, schoolAffiliation);
 					}
 					//TODO: Local user is only set if creating an account.
 
-					String authStatus = decryptMessage(streamIn.readUTF());
+					String authStatus = streamIn.readUTF();
 					if (authStatus.equals("success")) {
 						logged_in = true;
 						System.out.println("Logged in");
@@ -175,13 +195,13 @@ public class Client {
 							if (!canView) break;
 
 							// ask server to display a board
-							packagedMsg = packageMessage("<display board>");
+							packagedMsg = "<display board>";
 							streamOut.writeUTF(packagedMsg);
 							streamOut.flush();
 
 
 							// print the server's response
-							String incomingMsg = decryptMessage(streamIn.readUTF());
+							String incomingMsg = streamIn.readUTF();
 							System.out.println(incomingMsg);
 
 
@@ -193,14 +213,14 @@ public class Client {
 							if (!canPost) break;
 
 							messageToSend = "<post to board>";
-							streamOut.writeUTF(packageMessage(messageToSend));
+							streamOut.writeUTF(messageToSend);
 							streamOut.flush();
 
 							// if (decryptMessage(streamIn.readUTF()).equals("<board select failed>"))
 
 							System.out.println("What message would you like to post?\n");
 							messageToSend = console.nextLine();
-							packagedMsg = packageMessage(messageToSend);
+							packagedMsg = messageToSend;
 							streamOut.writeUTF(packagedMsg);
 							streamOut.flush();
 							// System.out.println("Message sent");
@@ -220,7 +240,7 @@ public class Client {
 			// close all the sockets and console
 			console.close();
 			streamOut.close();
-			serverSocket.close();
+			socket.close();
 
 		} catch (IOException e) {
 			// print error
@@ -232,16 +252,16 @@ public class Client {
 	private boolean boardSelectClient(DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
 		try {
 			// send a request to see the board options
-			streamOut.writeUTF(packageMessage("<boards request>"));
-			String boardMsgPrompt = decryptMessage(streamIn.readUTF());
+			streamOut.writeUTF("<boards request>");
+			String boardMsgPrompt = streamIn.readUTF();
 			// System.out.println("Select a board:\n" + incomingMsg + "\n");
 			System.out.println(boardMsgPrompt);
 			// pick a board
 			String selection = console.nextLine();
-			streamOut.writeUTF(packageMessage(selection));
+			streamOut.writeUTF(selection);
 			streamOut.flush();
 
-			String boardAffiliation = decryptMessage(streamIn.readUTF());
+			String boardAffiliation = streamIn.readUTF();
 			boardAffiliation = boardAffiliation.toLowerCase();
 
 			if (boardAffiliation.equals(localUser.getSchoolAffiliation())) {
@@ -258,76 +278,6 @@ public class Client {
 
 	}
 
-	private String packageMessage(String message) throws Exception {
-		StringBuilder acc = new StringBuilder();
-
-		Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-		cipher.init(Cipher.ENCRYPT_MODE, secretKey);
-		GCMParameterSpec spec = cipher.getParameters().getParameterSpec(GCMParameterSpec.class);
-
-		acc.append(Gen.encodeHexString(cipher.doFinal(message.getBytes())));
-		acc.append(",");
-		acc.append(Gen.encodeHexString(spec.getIV()));
-
-		Signature sign = Signature.getInstance("SHA256withRSA");
-		sign.initSign(privateMacKey); // signs with alice's private key
-		sign.update(acc.toString().getBytes());
-		acc.append(",");
-		acc.append(Gen.encodeHexString(sign.sign()));
-
-		return acc.toString();
-	}
-
-	public String decryptMessage(String message)
-			throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException,
-			BadPaddingException, InvalidAlgorithmParameterException {
-		String[] tokens = message.split(",");
-		Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-		GCMParameterSpec params = new GCMParameterSpec(128, Gen.decodeHexString(tokens[1]));
-
-		cipher.init(Cipher.DECRYPT_MODE, secretKey, params);
-
-		return new String(cipher.doFinal(Gen.decodeHexString(tokens[0])));
-	}
-
-	private String keyAgreement() throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException,
-			IllegalBlockSizeException, BadPaddingException, SignatureException {
-		StringBuilder acc = new StringBuilder();
-
-		acc.append("Bob,");
-
-		acc.append(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-		acc.append(",");
-
-		KeyGenerator factory = KeyGenerator.getInstance("AES");
-		factory.init(256);
-		secretKey = factory.generateKey();
-
-		Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
-		cipher.init(Cipher.ENCRYPT_MODE, bobKey);
-
-		String cipherTxt = "Alice,";
-
-		cipherTxt += Gen.encodeHexString(secretKey.getEncoded());
-
-		String encr_cipher = Gen.encodeHexString(cipher.doFinal(cipherTxt.getBytes()));
-
-		acc.append(encr_cipher);
-
-		Signature sign = Signature.getInstance("SHA256withRSA");
-		sign.initSign(privateMacKey); // signs with alice's private key
-
-		sign.update(acc.toString().getBytes());
-		// acc.append(",");
-		byte[] signed = sign.sign();
-
-		acc.append(",");
-		acc.append(Gen.encodeHexString(signed));
-
-		return acc.toString();
-
-	}
-
 	/**
 	 * args[0] ; port that Alice will connect to (Mallory's port)
 	 * args[1] ; program configuration
@@ -338,9 +288,6 @@ public class Client {
 		if (args.length != 1) {
 			System.out.println("Incorrect number of parameters");
 		} else {
-			// Security.addProvider(new
-			// org.bouncycastle.jce.provider.BouncyCastleProvider());
-
 			// create Alice to start communication
 			try {
 				Client alice = new Client(args[0]);
