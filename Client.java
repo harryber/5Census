@@ -15,7 +15,7 @@ public class Client {
 
 	private static final String[] cipher_suites = new String[]{"TLS_AES_256_GCM_SHA384"};
 	private static final String TRUSTSTORE_PATH = "client-truststore.jks";
-	private static final String TRUSTSTORE_PASS = "keystore1!";
+	private static final String TRUSTSTORE_PASS = "Keystore1!";
 
 	public Base64.Encoder encoder = Base64.getEncoder();
 	public Base64.Decoder decoder = Base64.getDecoder();

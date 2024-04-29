@@ -22,3 +22,11 @@ target/classes/Server.class
 /server_key.pem
 /server-truststore.jks
 /server_certificate.crt
+*.jks
+*.crt
+*.pem
+*.p12
+*.csr
+*.crt
+*.class
+
