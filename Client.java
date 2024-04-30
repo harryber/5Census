@@ -236,17 +236,16 @@ public class Client {
 							break;
 						case "create board":
 							messageToSend = "<create board>";
-							streamOut.writeUTF(packageMessage(messageToSend));
+							streamOut.writeUTF(messageToSend);
 							streamOut.flush();
 
 							audit.logPrint("What is the new board name?\n");
 							messageToSend = console.nextLine();
-							packagedMsg = packageMessage(messageToSend);
-							streamOut.writeUTF(packagedMsg);
+							streamOut.writeUTF(messageToSend);
 							streamOut.flush();
 
 							// wait for valid board name check
-							String status = decryptMessage(streamIn.readUTF());
+							String status = streamIn.readUTF();
 							if (!status.equals("<continue>")) {
 								audit.logPrint("Board already exists.");
 								break;
@@ -254,8 +253,7 @@ public class Client {
 
 							audit.logPrint("What is the college affiliation?\n(PO, HMC, CMC, PZ, and/or SC separated by spaces)\n");
 							messageToSend = console.nextLine();
-							packagedMsg = packageMessage(messageToSend);
-							streamOut.writeUTF(packagedMsg);
+							streamOut.writeUTF(messageToSend);
 							streamOut.flush();
 
 

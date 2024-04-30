@@ -271,21 +271,20 @@ public class Server {
 						// streamOut.flush();
 					}
 
-					String incomingMsg = streamIn.readUTF();
-					String postContents = incomingMsg;
+					String postContents = streamIn.readUTF();
 
-					Post newPost = new Post(selectedBoard.getName(), postContents);
+//					Post newPost = new Post(selectedBoard.getName(), postContents);
+//					selectedBoard.addPost(newPost);
+//					System.out.println(selectedBoard.getName() + ": " + selectedBoard.viewPublicPosts());
+//					postToBoard(selectedBoard.getName(), newPost);
+
+
+					Post newPost = new Post(currentUserName, selectedBoard.getName(), postContents);
 					selectedBoard.addPost(newPost);
 					System.out.println(selectedBoard.getName() + ": " + selectedBoard.viewPublicPosts());
 					postToBoard(selectedBoard.getName(), newPost);
-
-
-						Post newPost = new Post(currentUserName, selectedBoard.getName(), postContents);
-						selectedBoard.addPost(newPost);
-						System.out.println(selectedBoard.getName() + ": " + selectedBoard.viewPublicPosts());
-						postToBoard(selectedBoard.getName(), newPost);
-//						saveBoard(selectedBoard);
-//						saveBoards("boards.txt");
+//					saveBoard(selectedBoard);
+//					saveBoards("boards.txt");
 				
 
 					break;
@@ -310,23 +309,23 @@ public class Server {
 //					streamOut.writeUTF(packageMessage(boardContents));
 
 //					selectedBoard.setPublicPosts(getPublicPosts(selectedBoard.getName()));
-					streamOut.writeUTF(packageMessage(selectedBoard.viewPublicPosts()));
+					streamOut.writeUTF(selectedBoard.viewPublicPosts());
 					streamOut.flush();
 					break;
 				case "<create board>":
-					String boardName = decryptMessage(streamIn.readUTF());
+					String boardName = streamIn.readUTF();
 					System.out.println("The board name is " + boardName);
 					// make sure a board of this name doesn't already exist
 					if (checkForBoardExistence(boardName)) {
-						streamOut.writeUTF(packageMessage("<halt>"));
+						streamOut.writeUTF("<halt>");
 						streamOut.flush();
 					}
 					else {
-						streamOut.writeUTF(packageMessage("<continue>"));
+						streamOut.writeUTF("<continue>");
 						streamOut.flush();
 					}
 
-					String schoolAffiliationString = decryptMessage(streamIn.readUTF());
+					String schoolAffiliationString = streamIn.readUTF();
 					System.out.println("School affiliations: " + schoolAffiliationString);
 					// school string parser
 					ArrayList<String> schoolAffiliations = createSchoolArrFromStr(schoolAffiliationString);
