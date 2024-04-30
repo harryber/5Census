@@ -282,7 +282,7 @@ public class Server {
 					String username = streamIn.readUTF();
 					System.out.println("The username is " + username);
 					User user = createUserObjectFromName(username);
-					selectedBoard = boardSelectServer(boardArr, user, streamIn, streamOut);
+					selectedBoard = boardSelectServer(user, streamIn, streamOut);
 					break;
 				case "<display board>":
 					if (checkForErrorBoardSelection(selectedBoard, streamOut,
@@ -295,10 +295,65 @@ public class Server {
 					streamOut.writeUTF(packageMessage(posts.toString()));
 					streamOut.flush();
 					break;
+				case "<create board>":
+					String boardName = decryptMessage(streamIn.readUTF());
+					System.out.println("The board name is " + boardName);
+					// make sure a board of this name doesn't already exist
+					if (checkForBoardExistence(boardName)) {
+						streamOut.writeUTF(packageMessage("<halt>"));
+						streamOut.flush();
+					}
+					else {
+						streamOut.writeUTF(packageMessage("<continue>"));
+						streamOut.flush();
+					}
+
+					String schoolAffiliationString = decryptMessage(streamIn.readUTF());
+					System.out.println("School affiliations: " + schoolAffiliationString);
+					// school string parser
+					ArrayList<String> schoolAffiliations = createSchoolArrFromStr(schoolAffiliationString);
+					if (schoolAffiliations == null) break;
+
+					Board newBoard = createBoard(boardName, schoolAffiliations);
+					saveBoard(newBoard);
+
 				default:
 					break;
 			}
 		}
+	}
+
+	private ArrayList<String> createSchoolArrFromStr(String schoolAffiliationString) {
+		String[] schoolsStrArr = schoolAffiliationString.split("\\s+");
+		ArrayList<String> schoolsArr = new ArrayList<>();
+		for (String school : schoolsStrArr) {
+			school = school.toLowerCase();
+			if (school.equals("po") || school.equals("hmc") || school.equals("cmc") ||
+					school.equals("pz") || school.equals("sc")) {
+				schoolsArr.add(school);
+			}
+			else {
+				return null;
+			}
+		}
+		return schoolsArr;
+	}
+
+	private boolean checkForBoardExistence(String boardName) {
+		try (var mongoClient = MongoClients.create("mongodb+srv://cdv1:TrSLjmjeLmgkYPBm@cluster0.gqjf9pj.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")) {
+			MongoDatabase database = mongoClient.getDatabase("database");
+			MongoCollection<Document> collection = database.getCollection("boards");
+
+			Document query = new Document("name", boardName);
+			Document boardDoc = collection.find(query).first();
+			System.out.println(boardDoc != null);
+			return boardDoc != null;
+		}
+	 	catch (Exception e) {
+			e.printStackTrace();
+			return true;
+		}
+
 	}
 
 	private boolean checkForErrorBoardSelection(Board selectedBoard, DataOutputStream streamOut, String message)
@@ -327,26 +382,26 @@ public class Server {
 	 * Bridge method between server and client in order
 	 * to determine which board the client is trying to
 	 * interact with
-	 * 
-	 * @param boardArr  Array of all boards
+	 *
 	 * @param streamIn
 	 * @param streamOut
 	 * @return
 	 * @throws Exception
 	 */
-	private Board boardSelectServer(ArrayList<Board> boardArr, User user, DataInputStream streamIn, DataOutputStream streamOut)
+	private Board boardSelectServer(User user, DataInputStream streamIn, DataOutputStream streamOut)
 			throws Exception {
 		System.out.println("Board select server...");
+		boardArr = loadBoards();
 		// Construct the string of boards to send
 		StringBuilder messageToSend = new StringBuilder("Select a board:\n");
 		for (Board board : boardArr) {
 			// indicate to the user whether they have access to the board or not
 			System.out.println(board.getName());
 			if (board.hasAccess(user)) {
-				messageToSend.append(board.getName()).append("\n");
+				messageToSend.append(" -").append(board.getName()).append("\n");
 			}
 			else {
-				messageToSend.append(board.getName()).append(" (locked)\n");
+				messageToSend.append(" -").append(board.getName()).append(" (locked)\n");
 			}
 
 		}
