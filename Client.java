@@ -189,7 +189,7 @@ public class Client {
 				}
 
 				try {
-					System.out.print("\nWhat would you like to do? \n post message \n view board \n logout \n exit \n\n");
+					audit.logPrint("\nWhat would you like to do? \n -post message \n -view board \n -create board \n -logout \n -exit \n\n");
 					line = console.nextLine();
 
 					switch (line) {
@@ -227,9 +227,6 @@ public class Client {
 							streamOut.writeUTF(messageToSend);
 							streamOut.flush();
 
-							// if (decryptMessage(streamIn.readUTF()).equals("<board select failed>"))
-
-//							System.out.println("What message would you like to post?\n");
 							audit.logPrint("What message would you like to post?\n");
 							messageToSend = console.nextLine();
 							packagedMsg = messageToSend;
@@ -237,6 +234,32 @@ public class Client {
 							streamOut.flush();
 							// System.out.println("Message sent");
 							break;
+						case "create board":
+							messageToSend = "<create board>";
+							streamOut.writeUTF(packageMessage(messageToSend));
+							streamOut.flush();
+
+							audit.logPrint("What is the new board name?\n");
+							messageToSend = console.nextLine();
+							packagedMsg = packageMessage(messageToSend);
+							streamOut.writeUTF(packagedMsg);
+							streamOut.flush();
+
+							// wait for valid board name check
+							String status = decryptMessage(streamIn.readUTF());
+							if (!status.equals("<continue>")) {
+								audit.logPrint("Board already exists.");
+								break;
+							}
+
+							audit.logPrint("What is the college affiliation?\n(PO, HMC, CMC, PZ, and/or SC separated by spaces)\n");
+							messageToSend = console.nextLine();
+							packagedMsg = packageMessage(messageToSend);
+							streamOut.writeUTF(packagedMsg);
+							streamOut.flush();
+
+
+
 						default:
 //							System.out.println("Invalid action");
 							audit.log("Invalid action");
