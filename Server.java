@@ -50,7 +50,7 @@ public class Server {
 	public ArrayList<Board> boardArr = loadBoards();
 	public Board selectedBoard;
 	public HashMap<String, User> users;
-	public User currentUser;
+	public String currentUserName;
 
 	private static final String DB_NAME = "database";
 	private static final String COLLECTION_NAME = "users";
@@ -264,7 +264,7 @@ public class Server {
 					if (verifyMessage(incomingMsg)) {
 						String postContents = decryptMessage(incomingMsg);
 
-						Post newPost = new Post(selectedBoard.getName(), postContents);
+						Post newPost = new Post(currentUserName, selectedBoard.getName(), postContents);
 						selectedBoard.addPost(newPost);
 						System.out.println(selectedBoard.getName() + ": " + selectedBoard.viewPublicPosts());
 						postToBoard(selectedBoard.getName(), newPost);
@@ -279,9 +279,9 @@ public class Server {
 				case "<boards request>":
 					// how to get the current user?
 
-					String username = streamIn.readUTF();
-					System.out.println("The username is " + username);
-					User user = createUserObjectFromName(username);
+					currentUserName = streamIn.readUTF();
+					System.out.println("The username is " + currentUserName);
+					User user = createUserObjectFromName(currentUserName);
 					selectedBoard = boardSelectServer(user, streamIn, streamOut);
 					break;
 				case "<display board>":
@@ -290,9 +290,13 @@ public class Server {
 						break;
 					String boardContents = selectedBoard.viewPublicPosts();
 					ArrayList<Post> posts = getPublicPosts(selectedBoard.getName());
+					System.out.println(posts.toString());
+					selectedBoard.setPublicPosts(posts);
+					System.out.println(selectedBoard.getPublicPosts().toString());
 //					streamOut.writeUTF(packageMessage(boardContents));
 
-					streamOut.writeUTF(packageMessage(posts.toString()));
+//					selectedBoard.setPublicPosts(getPublicPosts(selectedBoard.getName()));
+					streamOut.writeUTF(packageMessage(selectedBoard.viewPublicPosts()));
 					streamOut.flush();
 					break;
 				case "<create board>":
@@ -562,9 +566,9 @@ public class Server {
 				if (publicPostsDocs != null) {
 					// Convert existing public posts documents to Post objects
 					for (Document publicPostDoc : publicPostsDocs) {
-						String title = publicPostDoc.getString("title");
+						String postUser = publicPostDoc.getString("postUser");
 						String content = publicPostDoc.getString("content");
-						publicPosts.add(new Post(title, content));
+						publicPosts.add(new Post(postUser, boardName, content));
 					}
 				}
 
@@ -595,9 +599,9 @@ public class Server {
 				List<Document> publicPostsDocs = (List<Document>) boardDoc.get("publicPosts");
 				if (publicPostsDocs != null) {
 					for (Document postDoc : publicPostsDocs) {
-						String title = postDoc.getString("title");
+						String postUser = postDoc.getString("postUser");
 						String content = postDoc.getString("content");
-						publicPosts.add(new Post(title, content));
+						publicPosts.add(new Post(postUser, boardName, content));
 					}
 				} else {
 					System.out.println("No public posts found for board: " + boardName);
@@ -615,7 +619,7 @@ public class Server {
 		List<Document> documents = new ArrayList<>();
 		for (Post post : posts) {
 			Document postDoc = new Document()
-					.append("title", "todo")
+					.append("postUser", post.getUserName())
 					.append("content", post.getPostContent());
 			documents.add(postDoc);
 		}
@@ -625,9 +629,10 @@ public class Server {
 	private List<Post> documentsToPosts(ArrayList<Document> documents) {
 		List<Post> posts = new ArrayList<>();
 		for (Document doc : documents) {
-			String title = doc.getString("title");
+			String postUser = doc.getString("postUser");
 			String content = doc.getString("content");
-			Post post = new Post(title, content);
+			// board name?
+			Post post = new Post(postUser, content);
 			posts.add(post);
 		}
 		return posts;
@@ -640,7 +645,7 @@ public class Server {
 			MongoCollection<Document> collection = database.getCollection("boards");
 
 			for (Document doc : collection.find()) {
-				String name = doc.getString("name");
+				String boardName = doc.getString("name");
 				ArrayList<String> schoolAffiliations = new ArrayList<>();
 				ArrayList<Post> publicPosts = new ArrayList<>();
 				ArrayList<Post> localPosts = new ArrayList<>();
@@ -655,9 +660,9 @@ public class Server {
 				List<Document> publicPostsDocs = (List<Document>) doc.get("publicPosts");
 				if (publicPostsDocs != null) {
 					for (Document postDoc : publicPostsDocs) {
-						String title = postDoc.getString("title");
+						String postUser = postDoc.getString("postUser");
 						String content = postDoc.getString("content");
-						publicPosts.add(new Post(title, content));
+						publicPosts.add(new Post(postUser, boardName, content));
 					}
 				}
 
@@ -666,12 +671,12 @@ public class Server {
 					for (Document postDoc : localPostsDocs) {
 						String title = postDoc.getString("title");
 						String content = postDoc.getString("content");
-						localPosts.add(new Post(title, content));
+						localPosts.add(new Post(title, boardName, content));
 					}
 				}
 
 
-				Board board = new Board(name, schoolAffiliations);
+				Board board = new Board(boardName, schoolAffiliations);
 //				System.out.println("BOARD: " + board.getName() + ", schools: " + schoolAffiliations.getFirst());
 				board.setPublicPosts(publicPosts);
 				board.setLocalPosts(localPosts);

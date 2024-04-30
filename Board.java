@@ -23,17 +23,18 @@ public class Board implements Serializable {
     }
 
     public String viewPublicPosts() {
-        String str = name + " board posts:" + "\n";
+        StringBuilder str = new StringBuilder(name + " board posts:" + "\n");
         // for (int i = public_posts.size() - 1; i >= 0; i--) {
         // str += public_posts.get(i);
         // str += "\n";
         // }
 
-        for (int i = 0; i < public_posts.size(); i++) {
-            str += public_posts.get(i).getPostContent() + "\n";
+        for (Post publicPost : public_posts) {
+            String postStr = publicPost.getUserName() + ": " + publicPost.getPostContent() + "\n";
+            str.append(postStr);
         }
 
-        return str;
+        return str.toString();
     }
     public boolean hasAccess(User user){
         for (String c : college) {
@@ -59,11 +60,11 @@ public class Board implements Serializable {
         return public_posts;
     }
 
-    public void setLocalPosts(ArrayList<Post> localPosts) {
-        this.local_posts = local_posts;
+    public void setLocalPosts(ArrayList<Post> localP) {
+        local_posts = localP;
     }
-    public void setPublicPosts(ArrayList<Post> publicPosts) {
-        this.public_posts = public_posts;
+    public void setPublicPosts(ArrayList<Post> publicP) {
+        public_posts = publicP;
     }
     public String getName() {
         return name;

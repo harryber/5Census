@@ -15,6 +15,14 @@ public class Post implements Serializable {
         this.reader_location = true;
     }
 
+    public Post(String username, String boardName, String content) {
+        this.u_name = username;
+        this.boardName = boardName;
+        this.content = content;
+        this.user_location = true;
+        this.reader_location = true;
+    }
+
     public Post(String id, String user_name, String board_name, boolean u_local, boolean local_vis, String message) {
         uid = id;
         u_name = user_name;
@@ -27,6 +35,8 @@ public class Post implements Serializable {
     public String getPostContent() {
         return content;
     }
+
+    public String getUserName() {return u_name; }
 
     public boolean isPosterLocal() {
         return user_location;
