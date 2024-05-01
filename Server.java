@@ -1,5 +1,8 @@
 
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.UpdateResult;
+import org.bson.conversions.Bson;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoClient;
@@ -186,13 +189,96 @@ public class Server {
 
 		private void authenticateUser(DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
 			while (true) {
-				String messageToSend = "Enter username and password (separated by space), or enter 1 to create an account";
+				String messageToSend = "Enter username and password (separated by space), " +
+						"\n enter 1 to create an account " +
+						"\n enter 2 to recover password";
+
 				streamOut.writeUTF(messageToSend);
 				streamOut.flush();
 				String signInOrRegister = streamIn.readUTF();
 
-				// Attempt to authenticate user
-				if (!signInOrRegister.equals("1")) {
+				// create a new user in db
+				if (signInOrRegister.equals("1")) {
+					String newUserCredentials = streamIn.readUTF();
+					String[] parts = newUserCredentials.split("\\s+");
+					String username = parts[0];
+					String password = parts[1];
+
+					// check if username is taken
+					Document existingUser = collection.find(new Document("username", username)).first();
+					if (existingUser != null) {
+						streamOut.writeUTF("failure");
+						streamOut.flush();
+
+					} else {
+
+						// programming password recovery
+						streamOut.writeUTF("In order to recover passwords in case of loss, please enter a security question:");
+						streamOut.flush();
+						String question = streamIn.readUTF();
+						System.out.println("question: " + question);
+						String answer = streamIn.readUTF();
+						System.out.println("answer: " + answer);
+						System.out.println("Question: " + question + ", answer: " + answer);
+						String schoolAffiliation = streamIn.readUTF();
+						String salt = BCrypt.gensalt();
+						String hashedPassword = BCrypt.hashpw(password, salt);
+
+						Document user = new Document("username", username)
+								.append("password", hashedPassword)
+								.append("salt", salt)
+								.append("schoolAffiliation", schoolAffiliation)
+								.append("question", question)
+								.append("answer", answer);
+
+						collection.insertOne(user);
+						System.out.println("New account created");
+						streamOut.writeUTF("<success>");
+						streamOut.flush();
+						break;
+
+					}
+				}
+				else if (signInOrRegister.equals("2")) {
+					String username = streamIn.readUTF();
+					Document query = new Document("username", username);
+					Document user = collection.find(query).first();
+
+					if (user != null) {
+						String question = user.getString("question");
+						streamOut.writeUTF(question);
+						streamOut.flush();
+
+						String providedAnswer = streamIn.readUTF();
+
+						System.out.println("Provided answer: " + providedAnswer + ", answer: " + user.getString("answer"));
+						if (providedAnswer.equals(user.getString("answer"))) {
+							streamOut.writeUTF("<success>");
+							streamOut.flush();
+							System.out.println("About to reset password.");
+
+							String newPassword = streamIn.readUTF();
+
+							String salt = BCrypt.gensalt();
+							String hashedPassword = BCrypt.hashpw(newPassword, salt);
+
+							Bson update = Updates.set("password", hashedPassword);
+							UpdateResult result = collection.updateOne(user, update);
+							streamOut.writeUTF("<success>");
+							streamOut.flush();
+
+							String schoolAffiliation = user.getString("schoolAffiliation");
+							streamOut.writeUTF(schoolAffiliation);
+							streamOut.flush();
+							break;
+						}
+					}
+					System.out.println("Recovery failed.");
+					// TODO: better handling if user exists, "forgot password" option
+					streamOut.writeUTF("<failure>");
+					streamOut.flush();
+
+				} else { // verify login
 					String credentials = signInOrRegister;
 
 					String[] parts = credentials.split("\\s+");
@@ -210,7 +296,7 @@ public class Server {
 						// Check if the entered password matches the stored hashed password
 						if (BCrypt.checkpw(password, hashedPassword)) {
 							System.out.println("User logged in successfully");
-							streamOut.writeUTF("success");
+							streamOut.writeUTF("<success>");
 							streamOut.flush();
 
 							// Send the user their school affiliation
@@ -226,31 +312,7 @@ public class Server {
 					// TODO: better handling if user exists, "forgot password" option
 					streamOut.writeUTF("failure");
 					streamOut.flush();
-				} else { // add new user to db
-					String newUserCredentials = streamIn.readUTF();
-					String[] parts = newUserCredentials.split("\\s+");
-					String username = parts[0];
-					String password = parts[1];
 
-					// check if username is taken
-					Document existingUser = collection.find(new Document("username", username)).first();
-					if (existingUser != null) {
-						streamOut.writeUTF("failure");
-						streamOut.flush();
-
-					} else {
-						String schoolAffiliation = streamIn.readUTF();
-						String salt = BCrypt.gensalt();
-						String hashedPassword = BCrypt.hashpw(password, salt);
-
-							Document user = new Document("username", username).append("password", hashedPassword)
-								.append("salt", salt).append("schoolAffiliation", schoolAffiliation);
-						collection.insertOne(user);
-						System.out.println("New account created");
-						streamOut.writeUTF("success");
-						streamOut.flush();
-						break;
-					}
 				}
 			}
 		}
@@ -289,8 +351,6 @@ public class Server {
 
 					break;
 				case "<boards request>":
-					// how to get the current user?
-
 					currentUserName = streamIn.readUTF();
 					System.out.println("The username is " + currentUserName);
 					User user = createUserObjectFromName(currentUserName);

@@ -19,6 +19,8 @@ public class User implements Serializable {
     private String email;
     private boolean verifed;
     private ArrayList<Post> posts;
+    private String question;
+    private String answer;
 
     public User(String name, String schoolAffiliation, String user_mail) {
         userName = name;
@@ -33,6 +35,16 @@ public class User implements Serializable {
         posts = new ArrayList<Post>();
         verifed = false;
     }
+
+    public User(String name, String schoolAffiliation, String question, String answer) {
+        userName = name;
+        this.schoolAffiliation = schoolAffiliation;
+        posts = new ArrayList<Post>();
+        verifed = false;
+        this.question = question;
+        this.answer = answer;
+    }
+
 
     public void addPost(Post newPost){
         posts.add(newPost);

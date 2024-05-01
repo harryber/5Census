@@ -128,6 +128,7 @@ public class Client {
 								audit.logPrint("Failed to meet username or password requirements."); // this is bad. tells you if you didnt enter a properly formatted password
 								audit.logPrint("Username: " + username);
 							} else {
+
 								validCredentials = true;
 							}
 						}
@@ -135,6 +136,31 @@ public class Client {
 						username = parts[0];
 						password = parts[1];
 						streamOut.writeUTF(credentials);
+						streamOut.flush();
+
+						// programming password recovery
+//						streamOut.writeUTF("In order to recover passwords in case of loss, please enter a security question:");
+						System.out.println(streamIn.readUTF());
+						String question = console.nextLine();
+
+
+						String answer = "a";
+						String tmp = "b";
+						while (!answer.equals(tmp)) {
+
+							System.out.println("Please enter an answer to your security question:");
+							answer = console.nextLine();
+							System.out.println("Please confirm your answer:");
+							tmp = console.nextLine();
+
+							if (!answer.equals(tmp))
+								System.out.println("Security answers do not match, please try again");
+
+						}
+
+						streamOut.writeUTF(question);
+						streamOut.flush();
+						streamOut.writeUTF(answer);
 						streamOut.flush();
 
 						// Select a college
@@ -161,26 +187,67 @@ public class Client {
 						streamOut.writeUTF(schoolAffiliation);
 						streamOut.flush();
 
-						localUser = new User(username, schoolAffiliation);
+						localUser = new User(username, schoolAffiliation, question, answer);
+					}
+					else if (credentials.equals("2")) {
+						String newPassword = "";
+
+						System.out.println("Enter usename:");
+						username = console.nextLine();
+						streamOut.writeUTF(username);
+						streamOut.flush();
+
+						String question = streamIn.readUTF();
+						System.out.println(question);
+
+						System.out.println("Answer: ");
+						String answer = console.nextLine();
+						streamOut.writeUTF(answer);
+						streamOut.flush();
+
+						String responseOp = streamIn.readUTF();
+						if (responseOp.equals("<success>")) {
+							///
+
+							boolean validCredentials = false;
+							while (!validCredentials) {
+								System.out.println("What is your new password?");
+								System.out.println("Password requirements: length between 8 and 32, include a symbol or number, one capital");
+								newPassword = console.nextLine();
+								Matcher passwordMatcher = passwordPattern.matcher(newPassword);
+
+								if (!passwordMatcher.matches()) {
+//								System.out.println("Failed to meet username or password requirements."); // this is bad. tells you if you didnt enter a properly formatted password
+									audit.logPrint("Failed to meet (recovery) password requirements."); // this is bad. tells you if you didnt enter a properly formatted password
+								} else {
+									validCredentials = true;
+								}
+							}
+
+							streamOut.writeUTF(newPassword);
+							streamOut.flush();
+
+						}
+						else {
+							System.out.println("Security question failed.");
+						}
+
+
 					}
 					else {
 						String[] parts = credentials.split("\\s+");
 						username = parts[0];
 					}
-					//TODO: Local user is only set if creating an account.
 
 					String authStatus = streamIn.readUTF();
-					if (authStatus.equals("success")) {
+					if (authStatus.equals("<success>")) {
 						logged_in = true;
-
 						if (localUser == null) {
-							localSchoolAffiliation = (streamIn.readUTF());
+							localSchoolAffiliation = streamIn.readUTF();
 							localUser = new User(username, localSchoolAffiliation);
 						}
-//						System.out.println("Logged in");
 						audit.logPrint("User has logged in");
 					} else {
-//						System.out.println("Failed to create account or log in (username may be taken). Please try again.");
 						audit.logPrint("Failed to create account or log in (username may be taken). Please try again.");
                     }
 
@@ -294,6 +361,7 @@ public class Client {
 			streamOut.flush();
 
 			streamOut.writeUTF(localUser.getName());
+
 			streamOut.flush();
 			String boardMsgPrompt = (streamIn.readUTF());
 			// System.out.println("Select a board:\n" + incomingMsg + "\n");
