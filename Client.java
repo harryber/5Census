@@ -256,14 +256,14 @@ public class Client {
 				}
 
 				try {
-					audit.logPrint("\nWhat would you like to do? \n -post message \n -view board \n -create board \n -logout \n -exit \n\n");
+					audit.logPrint("\nWhat would you like to do? \n -post message \n -view board \n -create board \n -exit \n\n");
 					line = console.nextLine();
 
 					switch (line) {
-						case "logout":
-//							System.out.println("HAH you thought you could escape?");
-							audit.logPrint("User has logged out");
-							break;
+//						case "logout":
+////							System.out.println("HAH you thought you could escape?");
+//							audit.logPrint("User has logged out");
+//							break;
 						case "exit":
 							keepLooping = false;
 							break;
