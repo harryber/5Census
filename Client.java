@@ -32,7 +32,7 @@ public class Client {
 		audit = new Audit(auditFile);
 
 		console = new Scanner(System.in);
-		System.out.println("This is Alice");
+//		System.out.println("This is Alice");
 
 		// obtain server's port number and connect to it
 		int serverPort = Integer.parseInt(serverPortStr);
@@ -47,9 +47,19 @@ public class Client {
 			FileInputStream fis = new FileInputStream(TRUSTSTORE_PATH);
 			trustStore.load(fis, TRUSTSTORE_PASS.toCharArray());
 
-			System.out.println("Connecting to Server at (" + serverPort + ", " + serverAddress + ")...");
+			String introMessage = "┌───────────────────────────────────────────────────────────────────────┐\n" +
+					"│ Startup                                                               │\n" +
+					"├───────────────────────────────────────────────────────────────────────┤\n" +
+					"│ Connecting to server at " + serverAddress + ":" + serverPort + "...                             │\n";
 
 
+
+//			String connectingMessage = "╔════════════════════════════════════════════════╗\n" +
+//					"║ Connecting to server at " + serverAddress + ":" + serverPort + " ...     ║\n";
+
+			System.out.print(introMessage);
+
+//			System.out.println("Connecting to server at port " + serverPort + " & address " + serverAddress + "...");
 
 			TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
 			tmf.init(trustStore);
@@ -64,7 +74,19 @@ public class Client {
 			socket.setEnabledProtocols(protocols);
 			socket.setEnabledCipherSuites(cipher_suites);
 			socket.startHandshake();
-			System.out.println("Handshake complete");
+
+			String introMessage2 =
+					"│ Handshake completed, connected!                                       │\n" +
+					"└───────────────────────────────────────────────────────────────────────┘";
+
+
+			System.out.println(introMessage2);
+
+//			System.out.println("Handshake completed, connected!");
+//			for (int i = 0; i < 60; i++)
+//				System.out.print("*");
+//			System.out.println();
+//			System.out.println();
 
 			OutputStreamWriter writer = new OutputStreamWriter(socket.getOutputStream());
 			writer.write("Hello, Server!\n");
@@ -84,7 +106,21 @@ public class Client {
 			while (keepLooping) {
 				while (!logged_in) {
 					String serverResponse = streamIn.readUTF();
-					System.out.println(serverResponse);
+
+					String optionsScreen =
+							"┌───────────────────────────────────────────────────────────────────────┐\n" +
+							"│ Login                               					                │\n" +
+							"├───────────────────────────────────────────────────────────────────────┤\n" +
+							"│ • Enter username and password (separated by space)	      		    │\n" +
+							"│ • Enter 1 to create an account     				                    │\n" +
+							"│ • Enter 2 to recover password                                   		│\n" +
+							"└───────────────────────────────────────────────────────────────────────┘";
+
+					streamOut.writeUTF(messageToSend);
+					streamOut.flush();
+					System.out.println(optionsScreen);
+
+//					System.out.println(serverResponse);
 					String credentials = console.nextLine();
 
 					streamOut.writeUTF(credentials);
@@ -104,14 +140,31 @@ public class Client {
 					if (credentials.equals("1")) {
 						boolean validCredentials = false;
 						while (!validCredentials) {
-							System.out.println("Enter new username and password separated by space");
-							System.out.println("Username requirements: Alphanumeric, length between 4 and 16");
-							System.out.println("Password requirements: length between 8 and 32, include a symbol or number, one capital");
+
+							String createAccountMessage = "┌───────────────────────────────────────────────────────────────────────┐\n" +
+									"│ Signup                                                                │\n" +
+									"├───────────────────────────────────────────────────────────────────────┤\n" +
+									"│ Enter a new username and password (space separated)                   │\n" +
+									"│                                                                       │\n" +
+									"│ Username requirements:                                                │\n" +
+									"│ - Alphanumeric characters only                                        │\n" +
+									"│ - Length between 4 and 16 characters                                  │\n" +
+									"│                                                                       │\n" +
+									"│ Password requirements:                                                │\n" +
+									"│ - Length between 8 and 32 characters                                  │\n" +
+									"│ - Include at least one symbol or number                               │\n" +
+									"│ - Include at least one uppercase letter                               │\n" +
+									"└───────────────────────────────────────────────────────────────────────┘";
+
+							System.out.println(createAccountMessage);
+//
+//							System.out.println("Enter a new username and password (space separated)");
+//							System.out.println("Username requirements: Alphanumeric, length between 4 and 16");
+//							System.out.println("Password requirements: length between 8 and 32, include a symbol or number, one capital");
 							credentials = console.nextLine();
 
 							String[] parts = credentials.split("\\s+");
 							if (parts.length != 2) {
-//								System.out.println("Invalid input format. Please enter username and password separated by space.");
 								audit.logPrint("Invalid input format. Please enter username and password separated by space.");
 								audit.logPrint(credentials);
 								continue;
@@ -140,21 +193,56 @@ public class Client {
 
 						// programming password recovery
 //						streamOut.writeUTF("In order to recover passwords in case of loss, please enter a security question:");
-						System.out.println(streamIn.readUTF());
-						String question = console.nextLine();
+//						System.out.println(streamIn.readUTF());
 
+						String screen =
+								"┌───────────────────────────────────────────────────────────────────────┐\n" +
+								"│ Signup                                                                │\n" +
+								"├───────────────────────────────────────────────────────────────────────┤\n" +
+								"│ Enter a security question for password recovery.                      │\n" +
+								"└───────────────────────────────────────────────────────────────────────┘";
+						System.out.println(screen);
+
+						String question = console.nextLine();
 
 						String answer = "a";
 						String tmp = "b";
 						while (!answer.equals(tmp)) {
 
-							System.out.println("Please enter an answer to your security question:");
+							String answerScreen =
+									"┌───────────────────────────────────────────────────────────────────────┐\n" +
+											"│ Signup                                                                │\n" +
+											"├───────────────────────────────────────────────────────────────────────┤\n" +
+											"│ Enter a secure answer for your recovery question.                     │\n" +
+											"└───────────────────────────────────────────────────────────────────────┘";
+							System.out.println(answerScreen);
+
+//							System.out.println("Please enter an answer to your security question:");
 							answer = console.nextLine();
-							System.out.println("Please confirm your answer:");
+
+							String answerConfScreen =
+									"┌───────────────────────────────────────────────────────────────────────┐\n" +
+											"│ Signup                                                                │\n" +
+											"├───────────────────────────────────────────────────────────────────────┤\n" +
+											"│ Re-enter a secure answer for your recovery question.                  │\n" +
+											"└───────────────────────────────────────────────────────────────────────┘";
+							System.out.println(answerConfScreen);
+
+//							System.out.println("Please confirm your answer:");
 							tmp = console.nextLine();
 
-							if (!answer.equals(tmp))
-								System.out.println("Security answers do not match, please try again");
+							if (!answer.equals(tmp)) {
+
+								String answerMisMatchScreen =
+										"┌───────────────────────────────────────────────────────────────────────┐\n" +
+												"│ Signup                                                                │\n" +
+												"├───────────────────────────────────────────────────────────────────────┤\n" +
+												"│ Answers do not match. Please try again.                               │\n" +
+												"└───────────────────────────────────────────────────────────────────────┘";
+								System.out.println(answerMisMatchScreen);
+
+//								System.out.println("Security answers do not match, please try again");
+							}
 
 						}
 
@@ -167,20 +255,39 @@ public class Client {
 						boolean validCollege = false;
 						String schoolAffiliation = "";
 						while (!validCollege) {
-							audit.logPrint("User is selecting a college");
+
+							String collegeScreen =
+									"┌───────────────────────────────────────────────────────────────────────┐\n" +
+									"│ Signup                                                                │\n" +
+									"├───────────────────────────────────────────────────────────────────────┤\n" +
+									"│ Enter a college affiliation [PO, HMC, CMC, PZ, SC]                    │\n" +
+									"└───────────────────────────────────────────────────────────────────────┘";
+
+							System.out.println(collegeScreen);
+
+//							audit.logPrint("User is selecting a college");
 //							System.out.println("Which college do you belong to? [PO, HMC, CMC, PZ, SC]");
-							audit.logPrint("Which college do you belong to? [PO, HMC, CMC, PZ, SC]");
+//							audit.logPrint("Which college do you belong to? [PO, HMC, CMC, PZ, SC]");
 							schoolAffiliation = console.nextLine();
 							schoolAffiliation = schoolAffiliation.toLowerCase();
 							if (schoolAffiliation.equals("po") || schoolAffiliation.equals("hmc") || schoolAffiliation.equals("cmc") ||
 									schoolAffiliation.equals("pz") || schoolAffiliation.equals("sc")) {
 
 								validCollege = true;
-								audit.logPrint("User has selected a valid college:" + schoolAffiliation);
+//								audit.logPrint("User has selected a valid college:" + schoolAffiliation);
 							}
 							else {
-//								System.out.println("Invalid school selection");
-								audit.logPrint("Invalid school selection");
+
+								String invalidSchool =
+										"┌───────────────────────────────────────────────────────────────────────┐\n" +
+										"│ Signup                                                                │\n" +
+										"├───────────────────────────────────────────────────────────────────────┤\n" +
+										"│ Invalid school selection. Please choose one of [PO, HMC, CMC, PZ, SC] │\n" +
+										"└───────────────────────────────────────────────────────────────────────┘";
+
+
+								System.out.println(invalidSchool);
+//								audit.logPrint("Invalid school selection");
 							}
 						}
 
@@ -192,13 +299,32 @@ public class Client {
 					else if (credentials.equals("2")) {
 						String newPassword = "";
 
-						System.out.println("Enter usename:");
+						String signInMessage =
+								"┌───────────────────────────────────────────────────────────────────────┐\n" +
+										"│ Account Recovery                                                      │\n" +
+										"├───────────────────────────────────────────────────────────────────────┤\n" +
+										"│ Enter username             											│\n" +
+										"└───────────────────────────────────────────────────────────────────────┘";
+
+
+
+						System.out.println(signInMessage);
 						username = console.nextLine();
 						streamOut.writeUTF(username);
 						streamOut.flush();
 
 						String question = streamIn.readUTF();
-						System.out.println(question);
+
+						String recoveryMessage =
+								"┌───────────────────────────────────────────────────────────────────────┐\n" +
+								"│ Signin                                                                 │\n" +
+								"├───────────────────────────────────────────────────────────────────────┤\n" +
+								"│" + question +                                                        "│\n" +
+								"└───────────────────────────────────────────────────────────────────────┘";
+
+
+
+						System.out.println(recoveryMessage);
 
 						System.out.println("Answer: ");
 						String answer = console.nextLine();
@@ -248,7 +374,8 @@ public class Client {
 						}
 						audit.logPrint("User has logged in");
 					} else {
-						audit.logPrint("Failed to create account or log in (username may be taken). Please try again.");
+						continue;
+//						audit.logPrint("Failed to create account or log in (username may be taken). Please try again.");
                     }
 
 

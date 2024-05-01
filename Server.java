@@ -189,9 +189,14 @@ public class Server {
 
 		private void authenticateUser(DataInputStream streamIn, DataOutputStream streamOut) throws Exception {
 			while (true) {
-				String messageToSend = "Enter username and password (separated by space), " +
-						"\n enter 1 to create an account " +
-						"\n enter 2 to recover password";
+				String messageToSend =
+						"┌────────────────────────────────────────────────────┐\n" +
+						"│ Please choose an option:                           │\n" +
+						"│                                                    │\n" +
+						"│ • Enter username and password (separated by space) │\n" +
+						"│ • Enter 1 to create an account                     │\n" +
+						"│ • Enter 2 to recover password                      │\n" +
+						"└────────────────────────────────────────────────────┘";
 
 				streamOut.writeUTF(messageToSend);
 				streamOut.flush();
@@ -213,7 +218,7 @@ public class Server {
 					} else {
 
 						// programming password recovery
-						streamOut.writeUTF("In order to recover passwords in case of loss, please enter a security question:");
+						streamOut.writeUTF("Enter a recovery question for your account:");
 						streamOut.flush();
 						String question = streamIn.readUTF();
 						System.out.println("question: " + question);
