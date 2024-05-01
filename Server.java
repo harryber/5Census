@@ -16,6 +16,8 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -30,6 +32,7 @@ import javax.net.ssl.*;
 public class Server {
 
 	// instance variables
+	public Audit audit = new Audit();
 
 	public Base64.Encoder encoder = Base64.getEncoder();
 	public Base64.Decoder decoder = Base64.getDecoder();
@@ -56,17 +59,21 @@ public class Server {
 	public SSLServerSocket serverSocket;
 
 	public Server(String bobPort, MongoCollection<Document> collection, ArrayList<Board> boardArr) throws Exception {
-
 		this.collection = collection;
 
-
 		// notify the identity of the server to the user
-		System.out.println("This is Bob");
+//		System.out.println("This is Bob");
 
 		// attempt to create a server with the given port number
 		int portNumber = Integer.parseInt(bobPort);
 		try {
-			System.out.println("Connecting to port " + portNumber + "...");
+			String introMessage = "┌───────────────────────────────────────────────────────────────────────┐\n" +
+					"│ Startup                                                               │\n" +
+					"├───────────────────────────────────────────────────────────────────────┤\n" +
+					"│ Connecting to port " + portNumber + "...                                            │\n";
+			System.out.print(introMessage);
+
+//			System.out.println("Connecting to port " + portNumber + "...");
 
 			KeyStore keyStore = KeyStore.getInstance("JKS");
 			FileInputStream fis = new FileInputStream(KEYSTORE_PATH);
@@ -90,12 +97,20 @@ public class Server {
 			serverSocket.setEnabledProtocols(protocols);
 			serverSocket.setEnabledCipherSuites(cipher_suites);
 			serverSocket.setReuseAddress(true);
-			System.out.println("Bob Server started at port " + portNumber);
+
+			// PRETTY
+			String introMessage2 =
+					"│ Server started at port " + portNumber + "!                                          │\n" +
+					"└───────────────────────────────────────────────────────────────────────┘";
+			System.out.println(introMessage2);
+
+//			System.out.println("Bob Server started at port " + portNumber);
 
 		} catch (IOException e) {
 			// print error if the server fails to create itself
-			System.out.println("Error in creating the server");
-			System.out.println(e);
+			audit.logPrint("Error in creating server:" + e.getMessage());
+//			System.out.println("Error in creating the server");
+//			System.out.println(e);
 		}
 
 		// clean up the connections before closing
@@ -107,15 +122,17 @@ public class Server {
 	public void start() {
 		while (true) {
 			try {
-				System.out.println("Attempting to establish new client connection");
+				audit.logPrint("Waiting for client connection...");
+//				System.out.println("Attempting to establish new client connection");
 //				serverSocket.setSoTimeout(5000); 5 second timeout
 				SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-				System.out.println("Client connected");
+				audit.logPrint("Client Connected");
+//				System.out.println("Client connected");
 
 				BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 				String line;
 				while ((line = reader.readLine()) != null) {
-					System.out.println("Received from client: " + line);
+//					System.out.println("Received from client: " + line);
 					break;
 				}
 
@@ -137,7 +154,8 @@ public class Server {
 			this.clientSocket = socket;
 			try {
 				streamIn = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
-				System.out.println("streamIn created");
+				audit.logPrint("StreamIn connection established");
+//				System.out.println("streamIn created");
 				streamOut = new DataOutputStream(clientSocket.getOutputStream());
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -152,7 +170,8 @@ public class Server {
 			try {
 				while (!finished) {
 					if (first) {
-						System.out.println("Attempting to verify user");
+						audit.logPrint("Attempting to verify user");
+//						System.out.println("Attempting to verify user");
 						authenticateUser(streamIn, streamOut);
 						first = false;
 					}
@@ -167,10 +186,10 @@ public class Server {
 //					}
 				}
 			} catch (SocketException e) {
-				System.out.println("Client connection closed unexpectedly");
+				audit.logPrint("Client connection closed (unexpectedly)");
 			} catch (IOException | NoSuchAlgorithmException | InvalidKeyException | SignatureException
 					| NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException e) {
-				System.out.println("IO Exception occurred: " + e.getMessage());
+				audit.logPrint("IO Exception occurred: " + e.getMessage());
 			} catch (InvalidAlgorithmParameterException e) {
 				throw new RuntimeException(e);
 			} catch (Exception e) {
@@ -216,10 +235,10 @@ public class Server {
 						streamOut.writeUTF("In order to recover passwords in case of loss, please enter a security question:");
 						streamOut.flush();
 						String question = streamIn.readUTF();
-						System.out.println("question: " + question);
+//						System.out.println("question: " + question);
 						String answer = streamIn.readUTF();
-						System.out.println("answer: " + answer);
-						System.out.println("Question: " + question + ", answer: " + answer);
+//						System.out.println("answer: " + answer);
+//						System.out.println("Question: " + question + ", answer: " + answer);
 						String schoolAffiliation = streamIn.readUTF();
 						String salt = BCrypt.gensalt();
 						String hashedPassword = BCrypt.hashpw(password, salt);
@@ -232,7 +251,8 @@ public class Server {
 								.append("answer", answer);
 
 						collection.insertOne(user);
-						System.out.println("New account created");
+						audit.logPrint("New user created: " + username);
+//						System.out.println("New account created");
 						streamOut.writeUTF("<success>");
 						streamOut.flush();
 						break;
@@ -251,11 +271,12 @@ public class Server {
 
 						String providedAnswer = streamIn.readUTF();
 
-						System.out.println("Provided answer: " + providedAnswer + ", answer: " + user.getString("answer"));
+//						System.out.println("Provided answer: " + providedAnswer + ", answer: " + user.getString("answer"));
 						if (providedAnswer.equals(user.getString("answer"))) {
 							streamOut.writeUTF("<success>");
 							streamOut.flush();
-							System.out.println("About to reset password.");
+							audit.logPrint("Password reset attempted by: " + username);
+//							System.out.println("About to reset password.");
 
 							String newPassword = streamIn.readUTF();
 
@@ -273,7 +294,8 @@ public class Server {
 							break;
 						}
 					}
-					System.out.println("Recovery failed.");
+					audit.logPrint("Failed recovery attempt by user:" + username);
+//					System.out.println("Recovery failed.");
 					// TODO: better handling if user exists, "forgot password" option
 					streamOut.writeUTF("<failure>");
 					streamOut.flush();
@@ -295,7 +317,8 @@ public class Server {
 						String hashedPassword = user.getString("password");
 						// Check if the entered password matches the stored hashed password
 						if (BCrypt.checkpw(password, hashedPassword)) {
-							System.out.println("User logged in successfully");
+							audit.log("User: " + username + " logged in successfully");
+//							System.out.println("User logged in successfully");
 							streamOut.writeUTF("<success>");
 							streamOut.flush();
 
@@ -303,12 +326,13 @@ public class Server {
 							String schoolAffiliation = user.getString("schoolAffiliation");
 							streamOut.writeUTF(schoolAffiliation);
 							streamOut.flush();
-							System.out.println("affiliation sent");
+//							System.out.println("affiliation sent");
 
 							break;
 						}
 					}
-					System.out.println("User not found or invalid credentials.");
+					audit.logPrint("User not found or invalid credentials.");
+//					System.out.println("User not found or invalid credentials.");
 					// TODO: better handling if user exists, "forgot password" option
 					streamOut.writeUTF("failure");
 					streamOut.flush();
@@ -319,7 +343,8 @@ public class Server {
 
 		private void processMessage(String decryptedMsg, DataInputStream streamIn, DataOutputStream streamOut)
 				throws Exception {
-			System.out.println("Processing client message");
+			audit.logPrint("Processing client message");
+//			System.out.println("Processing client message");
 			switch (decryptedMsg) {
 				case "<post to board>":
 					if (checkForErrorBoardSelection(selectedBoard, streamOut,
@@ -343,7 +368,7 @@ public class Server {
 
 					Post newPost = new Post(currentUserName, selectedBoard.getName(), postContents);
 					selectedBoard.addPost(newPost);
-					System.out.println(selectedBoard.getName() + ": " + selectedBoard.viewPublicPosts());
+//					System.out.println(selectedBoard.getName() + ": " + selectedBoard.viewPublicPosts());
 					postToBoard(selectedBoard.getName(), newPost);
 //					saveBoard(selectedBoard);
 //					saveBoards("boards.txt");
@@ -352,7 +377,7 @@ public class Server {
 					break;
 				case "<boards request>":
 					currentUserName = streamIn.readUTF();
-					System.out.println("The username is " + currentUserName);
+//					System.out.println("The username is " + currentUserName);
 					User user = createUserObjectFromName(currentUserName);
 					selectedBoard = boardSelectServer(user, streamIn, streamOut);
 					break;
@@ -363,9 +388,9 @@ public class Server {
 						break;
 					String boardContents = selectedBoard.viewPublicPosts();
 					ArrayList<Post> posts = getPublicPosts(selectedBoard.getName());
-					System.out.println(posts.toString());
+//					System.out.println(posts.toString());
 					selectedBoard.setPublicPosts(posts);
-					System.out.println(selectedBoard.getPublicPosts().toString());
+//					System.out.println(selectedBoard.getPublicPosts().toString());
 //					streamOut.writeUTF(packageMessage(boardContents));
 
 //					selectedBoard.setPublicPosts(getPublicPosts(selectedBoard.getName()));
@@ -374,7 +399,10 @@ public class Server {
 					break;
 				case "<create board>":
 					String boardName = streamIn.readUTF();
-					System.out.println("The board name is " + boardName);
+
+					audit.logPrint("New board: " + boardName);
+
+//					System.out.println("The board name is " + boardName);
 					// make sure a board of this name doesn't already exist
 					if (checkForBoardExistence(boardName)) {
 						streamOut.writeUTF("<halt>");
@@ -386,7 +414,7 @@ public class Server {
 					}
 
 					String schoolAffiliationString = streamIn.readUTF();
-					System.out.println("School affiliations: " + schoolAffiliationString);
+//					System.out.println("School affiliations: " + schoolAffiliationString);
 					// school string parser
 					ArrayList<String> schoolAffiliations = createSchoolArrFromStr(schoolAffiliationString);
 					if (schoolAffiliations == null) break;
@@ -423,7 +451,7 @@ public class Server {
 
 			Document query = new Document("name", boardName);
 			Document boardDoc = collection.find(query).first();
-			System.out.println(boardDoc != null);
+//			System.out.println(boardDoc != null);
 			return boardDoc != null;
 		}
 	 	catch (Exception e) {
@@ -467,13 +495,14 @@ public class Server {
 	 */
 	private Board boardSelectServer(User user, DataInputStream streamIn, DataOutputStream streamOut)
 			throws Exception {
-		System.out.println("Board select server...");
+
+//		System.out.println("Board select server...");
 		boardArr = loadBoards();
 		// Construct the string of boards to send
 		StringBuilder messageToSend = new StringBuilder("Select a board:\n");
 		for (Board board : boardArr) {
 			// indicate to the user whether they have access to the board or not
-			System.out.println(board.getName());
+//			System.out.println(board.getName());
 			if (board.hasAccess(user)) {
 				messageToSend.append(" -").append(board.getName()).append("\n");
 			}
@@ -495,7 +524,8 @@ public class Server {
 
 		// User inputs a board to select
 		String selection = streamIn.readUTF();
-		System.out.println("received a board selection...");
+//		System.out.println("received a board selection...");
+		audit.logPrint("Board selection");
 		// Confirm that the selected board actually exists
 		for (Board b : boardArr) {
 			if (b.getName().equals(selection)) {
@@ -533,7 +563,6 @@ public class Server {
 						.append("publicPosts", postsToDocuments(board.getPublicPosts()))
 						.append("localPosts", postsToDocuments(board.getLocalPosts())));
 				collection.updateOne(Filters.eq("name", board.getName()), updateQuery);
-				System.out.println("Board updated: " + board.getName());
 			} else {
 				// Board doesn't exist, insert it
 				Document boardDoc = new Document()
@@ -542,7 +571,7 @@ public class Server {
 						.append("publicPosts", postsToDocuments(board.getPublicPosts()))
 						.append("localPosts", postsToDocuments(board.getLocalPosts()));
 				collection.insertOne(boardDoc);
-				System.out.println("Board saved: " + board.getName());
+//				System.out.println("Board saved: " + board.getName());
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -578,7 +607,8 @@ public class Server {
 				Document updateQuery = new Document("$set", new Document("publicPosts", postsToDocuments(publicPosts)));
 				collection.updateOne(query, updateQuery);
 			} else {
-				System.out.println("Board not found: " + boardName);
+				audit.logPrint("Board not found: " + boardName);
+//				System.out.println("Board not found: " + boardName);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -603,10 +633,18 @@ public class Server {
 						publicPosts.add(new Post(postUser, boardName, content));
 					}
 				} else {
-					System.out.println("No public posts found for board: " + boardName);
+					DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+					LocalDateTime now = LocalDateTime.now();
+					String message = "No public posts found for board: " + boardName;
+					System.out.println(dateFormat.format(now) + " " + message + "\n");
+
 				}
 			} else {
-				System.out.println("Board not found: " + boardName);
+				DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+				LocalDateTime now = LocalDateTime.now();
+				String message = "Board not found: " + boardName;
+				System.out.println(dateFormat.format(now) + " " + message + "\n");
+
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -711,7 +749,7 @@ public class Server {
 	public static void main(String[] args) {
 		// check for correct # of parameters
 		if (args.length < 1) {
-			System.out.println("Incorrect number of parameters");
+//			System.out.println("Incorrect number of parameters");
 			return;
 		}
 

@@ -35,7 +35,10 @@ public class Audit {
 
     public void logPrint(String message) {
         log(message);
-        System.out.println(message);
+
+        DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+        LocalDateTime now = LocalDateTime.now();
+        System.out.println(dateFormat.format(now) + " " + message + "\n");
     }
 
     public void openAudit(String auditFilePath) {
