@@ -1,0 +1,1 @@
+web: java -Dserver.port=$1010 -jar target/CS181Sy-1.0-SNAPSHOW.jar
