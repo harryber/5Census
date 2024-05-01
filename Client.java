@@ -399,23 +399,38 @@ public class Client {
 						username = parts[0];
 					}
 
-					String authStatus = streamIn.readUTF(); // asks for password question from server, BUGGY
-//					System.out.println(authStatus + "auth status");
-					if (!authStatus.equals("<success>"))
-						authStatus = streamIn.readUTF(); // actual <success>
-//					System.out.println(authStatus + "auth status");
-
+					String authStatus = streamIn.readUTF();
 					if (authStatus.equals("<success>")) {
 						logged_in = true;
+
 						if (localUser == null) {
-							localSchoolAffiliation = streamIn.readUTF();
+							localSchoolAffiliation = (streamIn.readUTF());
 							localUser = new User(username, localSchoolAffiliation);
 						}
+//						System.out.println("Logged in");
 						audit.logPrint("User has logged in");
 					} else {
-						System.out.println(authStatus);
+//						System.out.println("Failed to create account or log in (username may be taken). Please try again.");
 						audit.logPrint("Failed to create account or log in (username may be taken). Please try again.");
-                    }
+					}
+
+//					String authStatus = streamIn.readUTF(); // asks for password question from server, BUGGY
+////					System.out.println(authStatus + "auth status");
+//					if (!authStatus.equals("<success>"))
+//						authStatus = streamIn.readUTF(); // actual <success>
+////					System.out.println(authStatus + "auth status");
+//
+//					if (authStatus.equals("<success>")) {
+//						logged_in = true;
+//						if (localUser == null) {
+//							localSchoolAffiliation = streamIn.readUTF();
+//							localUser = new User(username, localSchoolAffiliation);
+//						}
+//						audit.logPrint("User has logged in");
+//					} else {
+//						System.out.println(authStatus);
+//						audit.logPrint("Failed to create account or log in (username may be taken). Please try again.");
+//                    }
 
 
 
